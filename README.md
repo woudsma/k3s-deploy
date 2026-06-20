@@ -2,17 +2,6 @@
 
 Making it dead-simple to deploy apps on your own [K3s](https://k3s.io/) cluster.
 
-## What's in this repo
-
-| Directory | Description |
-|---|---|
-| `charts/app/` | Generic Helm chart for all app types (websites, APIs, databases) |
-| `cert-manager/` | ClusterIssuer for automatic Let's Encrypt SSL via cert-manager |
-| `registry/` | Private Docker registry (in-cluster) with htpasswd auth |
-| `deploy/` | Git-push deploy setup — Dokku-like `git push deploy main` experience |
-| `monitoring/` | Headlamp dashboard + Trivy vulnerability scanning |
-| `examples/` | Example `helm-values.yaml` files for common app types |
-
 ## Stack
 
 - **K3s** — lightweight, CNCF-certified Kubernetes distribution
@@ -65,13 +54,14 @@ After creating a fresh Hetzner VPS with Ubuntu, the guided `setup.sh` script bri
 
 **First, point your domain at the server.** Add a DNS A record for `*.<domain>` pointing to the server's IP. The cluster issues wildcard TLS for your subdomains, so this must resolve before setup runs.
 
-Then copy this repo to the server and run `setup.sh`. It prompts for your domain and registry credentials, replaces the `mysite.com` placeholder repo-wide, and installs everything: K3s, security hardening, cert-manager + Let's Encrypt, the private registry and its pull/push secrets, the git-push deploy system, and the monitoring stack.
+Then copy this repo to the server and run `setup.sh`: 
 
 ```bash
 rsync -a --exclude='.git' . root@<server-ip>:/tmp/k3s-deploy
 ssh root@<server-ip>
 bash /tmp/k3s-deploy/setup.sh
 ```
+This prompts for your domain and registry credentials, replaces the `mysite.com` placeholder repo-wide, and installs everything: K3s, security hardening, cert-manager + Let's Encrypt, the private registry and its pull/push secrets, the git-push deploy system, and the monitoring stack.
 
 When it finishes, the script prints the remaining manual steps — including copying the kubeconfig from `/etc/rancher/k3s/k3s.yaml` to your local `~/.kube/config` (replace `127.0.0.1` with the server IP) for remote `kubectl` access.
 
@@ -100,3 +90,14 @@ kubectl logs -l app=trivy-scan --tail=100
 ## Examples
 
 The [`examples/`](examples/) directory has ready-to-use `helm-values.yaml` files for common app types — websites, APIs, WebSocket apps, databases, multi-domain setups, per-environment configs, and GitHub Actions workflows.
+
+## What's in this repo
+
+| Directory | Description |
+|---|---|
+| `charts/app/` | Generic Helm chart for all app types (websites, APIs, databases) |
+| `cert-manager/` | ClusterIssuer for automatic Let's Encrypt SSL via cert-manager |
+| `registry/` | Private Docker registry (in-cluster) with htpasswd auth |
+| `deploy/` | Git-push deploy setup — Dokku-like `git push deploy main` experience |
+| `monitoring/` | Headlamp dashboard + Trivy vulnerability scanning |
+| `examples/` | Example `helm-values.yaml` files for common app types |
