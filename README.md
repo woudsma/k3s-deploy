@@ -1,6 +1,7 @@
 # k3s-deploy
 
-Making it dead-simple to deploy apps on your own [K3s](https://k3s.io/) cluster.
+Making it dead-simple to deploy apps on your own [K3s](https://k3s.io/) cluster.  
+Tested on a Hetzner CX23 Ubuntu VPS.
 
 ## Stack
 
