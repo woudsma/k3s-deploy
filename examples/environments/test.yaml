@@ -7,7 +7,7 @@ replicas: 1
 
 ingress:
   hosts:
-    - my-app-test.mysite.com
+    - tst.mysite.com
 
 resources:
   requests:

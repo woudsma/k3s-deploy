@@ -7,7 +7,7 @@ replicas: 2
 
 ingress:
   hosts:
-    - my-app.mysite.com
+    - mysite.com
 
 probes:
   path: /health

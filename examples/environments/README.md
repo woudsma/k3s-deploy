@@ -18,9 +18,9 @@ my-app/
 
 | File | Namespace | Hostname | Replicas | Notes |
 |---|---|---|---|---|
-| `dev.yaml` | `dev` | `my-app.mysite.com` | 1 | Debug logging, minimal resources |
-| `test.yaml` | `test` | `my-app-test.mysite.com` | 1 | Mirrors prod config at lower scale |
-| `prod.yaml` | `prod` | `my-app.mysite.com` | 2 | Stricter probes, higher resources |
+| `dev.yaml` | `dev` | `dev.mysite.com` | 1 | Debug logging, minimal resources |
+| `test.yaml` | `test` | `tst.mysite.com` | 1 | Mirrors prod config at lower scale |
+| `prod.yaml` | `prod` | `mysite.com` | 2 | Stricter probes, higher resources |
 
 ## Deploying manually
 

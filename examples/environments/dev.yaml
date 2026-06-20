@@ -7,7 +7,7 @@ replicas: 1
 
 ingress:
   hosts:
-    - my-app.mysite.com
+    - dev.mysite.com
 
 resources:
   requests:
