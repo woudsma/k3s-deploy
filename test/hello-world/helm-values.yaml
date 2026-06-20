@@ -1,0 +1,7 @@
+# Minimal static website — name + hostname, everything else from chart defaults
+# (image.registry, port 80, httpGet / probe, small resources).
+name: hello-world
+
+ingress:
+  hosts:
+    - hello-world.test.local

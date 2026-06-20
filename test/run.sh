@@ -83,6 +83,20 @@ docker exec "$CONTAINER" mkdir -p /tmp/k3s-deploy
 tar -C "$REPO_ROOT" --exclude='./.git' --exclude='./test' -cf - . \
   | docker exec -i "$CONTAINER" tar -C /tmp/k3s-deploy -xf -
 
+# ── 3b. Pre-seed registry trust BEFORE k3s starts ─────────────
+# The test registry is served by Traefik with a self-signed cert (cert-manager
+# can't issue for test.local offline). Telling containerd to skip TLS verify and
+# resolving the registry host to localhost must be in place before K3s installs —
+# doing it afterward would require restarting k3s, which orphans port-holding pods
+# (Traefik/registry) and breaks the cluster. A real VPS needs none of this.
+docker exec "$CONTAINER" bash -c 'mkdir -p /etc/rancher/k3s && cat > /etc/rancher/k3s/registries.yaml <<EOF
+configs:
+  "registry.'"${TEST_DOMAIN}"'":
+    tls:
+      insecure_skip_verify: true
+EOF
+grep -q "registry.'"${TEST_DOMAIN}"'" /etc/hosts || echo "127.0.0.1 registry.'"${TEST_DOMAIN}"'" >> /etc/hosts'
+
 # ── 4. Run setup.sh non-interactively ─────────────────────────
 blu "Running setup.sh (this pulls images — give it a few minutes)…"
 docker exec -i -e INSTALL_K3S_EXEC='--snapshotter=native' "$CONTAINER" \
@@ -101,6 +115,11 @@ SETUP_RC=$?
 
 # ── 5. Assertions ─────────────────────────────────────────────
 blu "Verifying the cluster…"
+# Give image-pulling workloads a moment to roll out before asserting.
+docker exec "$CONTAINER" bash -c \
+  'kubectl rollout status deploy/registry -n registry --timeout=120s;
+   kubectl rollout status deploy/headlamp -n headlamp --timeout=120s' >/dev/null 2>&1 || true
+
 PASS=0; FAIL=0
 check() { # description, shell-snippet (run inside container)
   if docker exec "$CONTAINER" bash -c "$2" >/dev/null 2>&1; then
@@ -125,14 +144,57 @@ check "helm chart copied"             "test -f /opt/helm-charts/app/Chart.yaml"
 check "cleanup-old-images installed"  "test -x /usr/local/bin/cleanup-old-images"
 check "sudoers grant is valid"        "visudo -cf /etc/sudoers.d/deploy-cleanup"
 check "domain placeholder replaced"   "grep -rq 'registry.test.local' /tmp/k3s-deploy/registry/registry.yaml"
-check "no mysite.com left in configs" "! grep -rq 'mysite.com' /tmp/k3s-deploy --include='*.yaml' --include='*.sh'"
+# setup.sh keeps the placeholder in its own prompt text by design, so exclude it.
+check "no mysite.com left in configs" "! grep -rq 'mysite.com' /tmp/k3s-deploy --include='*.yaml' --include='*.sh' --exclude='setup.sh'"
+
+# ── 6. Deploy test: a real git-push of a static hello-world app ─
+# Exercises the whole pipeline: git push → Kaniko build → push to the private
+# registry → Helm deploy → reachable through Traefik. The build logs stream back
+# over SSH exactly like the real Dokku-style experience.
+blu "Deploying a sample app via git push (build logs stream below)…"
+
+# In-cluster build/pull pods resolve registry.${TEST_DOMAIN} via CoreDNS → Traefik.
+docker exec -i "$CONTAINER" kubectl apply -f - >/dev/null <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns-custom
+  namespace: kube-system
+data:
+  registry.override: |
+    rewrite name registry.${TEST_DOMAIN} traefik.kube-system.svc.cluster.local
+EOF
+docker exec "$CONTAINER" kubectl rollout restart deploy/coredns -n kube-system >/dev/null 2>&1 || true
+docker exec "$CONTAINER" kubectl rollout status deploy/coredns -n kube-system --timeout=90s >/dev/null 2>&1 || true
+
+# Kaniko skips TLS verify for the self-signed test registry (no-op flag in prod).
+docker exec "$CONTAINER" bash -c \
+  'grep -q KANIKO_EXTRA_ARGS /home/deploy/.deploy.conf || echo '\''KANIKO_EXTRA_ARGS="--skip-tls-verify"'\'' >> /home/deploy/.deploy.conf'
+
+docker exec "$CONTAINER" systemctl is-active ssh >/dev/null 2>&1 || docker exec "$CONTAINER" systemctl start ssh
+
+# Stage the sample app and push it over SSH (the real user flow).
+docker exec "$CONTAINER" rm -rf /root/hello-world
+docker cp "${REPO_ROOT}/test/hello-world" "$CONTAINER:/root/hello-world"
+docker exec "$CONTAINER" chown -R root:root /root/hello-world
+docker exec "$CONTAINER" bash -c \
+  'cd /root/hello-world && git init -q && git add -A && git -c user.email=t@t.local -c user.name=tester commit -qm "hello world"'
+docker exec "$CONTAINER" bash -c \
+  'cd /root/hello-world && GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git push deploy@localhost:hello-world HEAD:main'
+DEPLOY_RC=$?
+[ "$DEPLOY_RC" -eq 0 ] && grn "git push deploy exited 0" || red "git push deploy exited ${DEPLOY_RC}"
+
+blu "Verifying the deployed app…"
+check "hello-world pod is Running"     "kubectl get pods -l app=hello-world --no-headers | grep -q ' Running'"
+check "image pulled from registry"     "kubectl get pod -l app=hello-world -o jsonpath='{.items[0].spec.containers[0].image}' | grep -q '^registry.${TEST_DOMAIN}/hello-world:'"
+check "page served through Traefik"    "curl -sk --resolve hello-world.${TEST_DOMAIN}:443:127.0.0.1 https://hello-world.${TEST_DOMAIN}/ | grep -q HELLO-FROM-K3S-DEPLOY-TEST"
 
 # ── Summary ───────────────────────────────────────────────────
 echo
-if [ "$FAIL" -eq 0 ] && [ "$SETUP_RC" -eq 0 ]; then
+if [ "$FAIL" -eq 0 ] && [ "$SETUP_RC" -eq 0 ] && [ "${DEPLOY_RC:-1}" -eq 0 ]; then
   grn "PASS — ${PASS}/$((PASS + FAIL)) checks (container left running; 'test/run.sh shell' to inspect)"
   exit 0
 else
-  red "FAIL — ${FAIL} check(s) failed, setup rc=${SETUP_RC} (container left running; 'test/run.sh shell' to inspect)"
+  red "FAIL — ${FAIL} check(s) failed, setup rc=${SETUP_RC}, deploy rc=${DEPLOY_RC:-?} (container left running; 'test/run.sh shell' to inspect)"
   exit 1
 fi

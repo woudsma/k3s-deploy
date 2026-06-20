@@ -111,6 +111,19 @@ echo ""
 echo "▶ Installing cert-manager..."
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
 kubectl wait --for=condition=available deployment --all -n cert-manager --timeout=120s
+
+# "available" doesn't mean the admission webhook is serving with its CA injected yet,
+# so applying the ClusterIssuer immediately can fail with an x509 webhook error.
+# Retry until the webhook accepts it.
+echo "  Waiting for cert-manager webhook, then creating ClusterIssuer..."
+for _ in $(seq 1 30); do
+  if kubectl apply -f "${SCRIPT_DIR}/cert-manager/cluster-issuer.yaml" >/dev/null 2>&1; then
+    echo "  ClusterIssuer created"
+    break
+  fi
+  sleep 5
+done
+# Final attempt surfaces the real error (and aborts) if it never became ready.
 kubectl apply -f "${SCRIPT_DIR}/cert-manager/cluster-issuer.yaml"
 
 # ── Private registry ──────────────────────────────────────────

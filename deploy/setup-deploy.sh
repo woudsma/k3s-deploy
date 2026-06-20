@@ -69,6 +69,7 @@ if [ -f "${SCRIPT_DIR}/cleanup-old-images.sh" ]; then
   chown root:root /usr/local/bin/cleanup-old-images
   chmod 755 /usr/local/bin/cleanup-old-images
   # Let the unprivileged deploy user run ONLY this one script as root.
+  mkdir -p /etc/sudoers.d
   echo "${DEPLOY_USER} ALL=(root) NOPASSWD: /usr/local/bin/cleanup-old-images" \
     > /etc/sudoers.d/deploy-cleanup
   chmod 440 /etc/sudoers.d/deploy-cleanup

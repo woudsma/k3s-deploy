@@ -41,6 +41,15 @@ TAG="${SHA:0:7}"
 IMAGE="${REGISTRY}/${APP_NAME}:${TAG}"
 JOB_NAME="build-${SAFE_NAME}-${TAG}"
 
+# Optional extra flags for the Kaniko build (set in /home/deploy/.deploy.conf).
+# Empty by default; used e.g. for insecure/self-signed internal registries
+# (--skip-tls-verify) or build args. Rendered as YAML list items below.
+KANIKO_EXTRA_ARGS="${KANIKO_EXTRA_ARGS:-}"
+EXTRA_ARGS_YAML=""
+for _arg in $KANIKO_EXTRA_ARGS; do
+  EXTRA_ARGS_YAML+="            - \"${_arg}\""$'\n'
+done
+
 echo ""
 echo "════════════════════════════════════════════════════"
 echo "  Deploying ${APP_NAME} @ ${TAG}"
@@ -82,7 +91,7 @@ spec:
             - "--destination=${REGISTRY}/${APP_NAME}:latest"
             - "--cache=true"
             - "--cache-repo=${REGISTRY}/${APP_NAME}/cache"
-          volumeMounts:
+${EXTRA_ARGS_YAML}          volumeMounts:
             - name: build-context
               mountPath: /workspace
               readOnly: true

@@ -98,7 +98,49 @@ k3s-deploy/
 │   └── trivy-scan.yaml     # Daily image vulnerability scanner (CronJob)
 ├── registry/
 │   └── registry.yaml       # Private registry: Deployment, PVC, Service, Ingress
+├── test/
+│   ├── Dockerfile          # Systemd Ubuntu image mimicking a fresh Hetzner VPS
+│   ├── run.sh              # Runs setup.sh + a sample deploy in a container + asserts
+│   └── hello-world/        # Sample static app pushed by the deploy test
+│       ├── Dockerfile
+│       ├── index.html
+│       └── helm-values.yaml
 ```
+
+---
+
+## Testing a fresh install locally
+
+`test/run.sh` runs the real `setup.sh` end-to-end against a throwaway, systemd-enabled
+Ubuntu container that stands in for a fresh Hetzner VPS, asserts the cluster came up
+(node Ready, cert-manager, registry, secrets, deploy user, Helm chart, cleanup script +
+sudoers, domain replacement), then does a **real `git push` deploy** of the
+`test/hello-world/` static app — exercising the full pipeline (Kaniko build → push to
+the private registry → Helm deploy → reachable through Traefik) with the build logs
+streaming back. 19 checks total. Requires Docker running.
+
+```bash
+test/run.sh          # build base image (once), run setup.sh + sample deploy, assert
+test/run.sh shell    # open a shell in the last test container to poke around
+test/run.sh clean    # remove the test container + base image
+```
+
+It's reproducible and cheap to repeat: each run force-removes the previous container
+and reuses the cached base image, so running it many times doesn't pile up images.
+
+Test-environment accommodations (production code is unchanged):
+- K3s can't use the overlayfs snapshotter nested in Docker, so the harness injects
+  `INSTALL_K3S_EXEC=--snapshotter=native`. A real VPS uses overlayfs.
+- The optional prompts (hardening/swap/zsh/motd) are answered "no" — they touch
+  host-level facilities (ufw, swapon, chsh) not meaningful in a container.
+- The registry has no public DNS or real cert offline, so the harness routes
+  `registry.<domain>` through Traefik with TLS verification skipped: a pre-install
+  `registries.yaml` (containerd) + `/etc/hosts` entry, a CoreDNS rewrite (build/pull
+  pods), and `KANIKO_EXTRA_ARGS="--skip-tls-verify"` in the deploy config. The
+  `registries.yaml` is written *before* K3s installs on purpose — adding it later needs
+  a k3s restart, which orphans port-holding pods (Traefik/registry) and breaks the
+  cluster. `KANIKO_EXTRA_ARGS` is a general hook knob (empty in prod, also useful for
+  real insecure/internal registries).
 
 ---
 

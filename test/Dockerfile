@@ -9,8 +9,9 @@ ENV container=docker
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       systemd systemd-sysv \
-      curl ca-certificates git openssh-client iproute2 \
- && rm -rf /var/lib/apt/lists/*
+      curl ca-certificates git openssh-client openssh-server iproute2 sudo \
+ && rm -rf /var/lib/apt/lists/* \
+ && systemctl enable ssh
 
 # On a real server root already has an authorized_keys (you SSH in with a key).
 # setup-deploy.sh reads it, so seed one or the run aborts under `set -e`.
