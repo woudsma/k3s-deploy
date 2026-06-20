@@ -23,6 +23,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
     spec:
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
       {{- if .Values.image.pullSecrets }}
       imagePullSecrets:
         - name: kaniko-registry-creds
@@ -45,6 +46,15 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           {{- if eq .Values.probes.type "http" }}
+          {{- if .Values.probes.startup }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.probes.path }}
+              port: {{ .Values.port }}
+            periodSeconds: {{ .Values.probes.startupPeriodSeconds }}
+            timeoutSeconds: {{ .Values.probes.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.startupFailureThreshold }}
+          {{- end }}
           livenessProbe:
             httpGet:
               path: {{ .Values.probes.path }}
@@ -62,6 +72,15 @@ spec:
             timeoutSeconds: {{ .Values.probes.timeoutSeconds }}
             failureThreshold: {{ .Values.probes.failureThreshold }}
           {{- else if eq .Values.probes.type "exec" }}
+          {{- if .Values.probes.startup }}
+          startupProbe:
+            exec:
+              command:
+                {{- toYaml .Values.probes.execCommand | nindent 16 }}
+            periodSeconds: {{ .Values.probes.startupPeriodSeconds }}
+            timeoutSeconds: {{ .Values.probes.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.startupFailureThreshold }}
+          {{- end }}
           livenessProbe:
             exec:
               command:
