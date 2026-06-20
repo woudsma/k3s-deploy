@@ -33,6 +33,8 @@ See [CLAUDE.md](CLAUDE.md) for a step-by-step breakdown of everything `setup.sh`
 
 ## How deployments work
 
+![git push](./deploy.svg)
+
 Each app only needs a `helm-values.yaml` to override the helm defaults (seen in `charts/app/`) — no raw Kubernetes manifests required. 
 
 ```

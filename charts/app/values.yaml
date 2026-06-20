@@ -35,20 +35,16 @@ probes:
   periodSeconds: 10
   timeoutSeconds: 1
   failureThreshold: 3
-  # Startup probe: polls quickly while the app is booting so a ready pod is
-  # detected within ~startupPeriodSeconds instead of waiting a full readiness
-  # periodSeconds. This is what keeps deploys fast — without it, a long
-  # readiness periodSeconds delays the rollout by up to that many seconds.
-  # The app gets startupPeriodSeconds * startupFailureThreshold to come up
-  # (default 2s * 30 = 60s) before being considered failed.
+  # Polls quickly while booting so a ready pod is detected fast, instead of
+  # waiting a full readiness periodSeconds (keeps deploys snappy). The app gets
+  # startupPeriodSeconds * startupFailureThreshold to start (2s * 30 = 60s).
   startup: true
   startupPeriodSeconds: 2
   startupFailureThreshold: 30
 
-# -- How long to wait for the old pod to shut down gracefully on a deploy.
-# Lower this (e.g. 10) for apps that handle SIGTERM quickly; with the Recreate
-# strategy the new pod can't start until the old one is gone, so a long grace
-# period directly slows deploys. Leave at 30 for apps that need time to flush.
+# -- Grace period for the old pod to shut down on a deploy. Lower (e.g. 10) for
+# apps that handle SIGTERM quickly; with Recreate the new pod waits for the old
+# one to exit, so a long period slows deploys. Keep 30 if the app must flush.
 terminationGracePeriodSeconds: 30
 
 # -- Resources

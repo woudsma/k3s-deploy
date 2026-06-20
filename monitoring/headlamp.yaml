@@ -7,8 +7,6 @@
 #
 # Create an admin token to log in:
 #   kubectl create token headlamp -n headlamp --duration=8760h
-#
-# Apply with: kubectl apply -f monitoring/headlamp.yaml
 apiVersion: v1
 kind: Namespace
 metadata:

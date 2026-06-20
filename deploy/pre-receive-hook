@@ -41,17 +41,10 @@ TAG="${SHA:0:7}"
 IMAGE="${REGISTRY}/${APP_NAME}:${TAG}"
 JOB_NAME="build-${SAFE_NAME}-${TAG}"
 
-# Optional extra flags for the Kaniko build (set in /home/deploy/.deploy.conf).
-# Empty by default; used e.g. for insecure/self-signed internal registries
-# (--skip-tls-verify) or build args.
-#
-# Each flag becomes a 12-space-indented YAML list item ending in a newline, so
-# in the job manifest below "${EXTRA_ARGS_YAML}volumeMounts:" renders as:
-#   - "--flag-a"          (extra args, 12 spaces, only when set)
-#   - "--flag-b"
-# volumeMounts:           (always, 10 spaces — sits where EXTRA_ARGS_YAML's
-#                          trailing newline left off; empty value adds nothing)
-# Word-splitting on the unquoted expansion is intentional (one item per flag).
+# Optional extra Kaniko flags (set in .deploy.conf), e.g. --skip-tls-verify for
+# self-signed registries. Each becomes a 12-space-indented YAML list item with a
+# trailing newline, so "${EXTRA_ARGS_YAML}volumeMounts:" lines up in the manifest
+# below (empty adds nothing). Word-splitting is intentional — one item per flag.
 KANIKO_EXTRA_ARGS="${KANIKO_EXTRA_ARGS:-}"
 EXTRA_ARGS_YAML=""
 for _arg in $KANIKO_EXTRA_ARGS; do
