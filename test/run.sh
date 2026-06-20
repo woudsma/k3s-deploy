@@ -9,7 +9,8 @@
 # container and starts clean. The base image is built once and reused, so running
 # this many times does NOT pile up images.
 #
-#   test/run.sh          build base (if needed) → run setup.sh → assert
+#   test/run.sh          build base (if needed) → run setup.sh headless → assert
+#   test/run.sh interactive   same, but you answer setup.sh's prompts at a TTY
 #   test/run.sh shell    open a shell in the last test container (for poking around)
 #   test/run.sh clean    remove the test container and base image
 #
@@ -39,6 +40,7 @@ grn() { printf '\033[32m%s\033[0m\n' "$*"; }
 blu() { printf '\n\033[1;34m▶ %s\033[0m\n' "$*"; }
 
 # ── Subcommands ────────────────────────────────────────────────
+INTERACTIVE=0
 case "${1:-run}" in
   clean)
     if docker rm -f "$CONTAINER" >/dev/null 2>&1; then grn "Removed container $CONTAINER"; fi
@@ -49,7 +51,8 @@ case "${1:-run}" in
     exec docker exec -it "$CONTAINER" bash
     ;;
   run) ;;
-  *) red "Unknown command: $1 (use: run | shell | clean)"; exit 2 ;;
+  interactive|-i|--interactive) INTERACTIVE=1 ;;
+  *) red "Unknown command: $1 (use: run | interactive | shell | clean)"; exit 2 ;;
 esac
 
 # ── Preconditions ──────────────────────────────────────────────
@@ -97,10 +100,26 @@ configs:
 EOF
 grep -q "registry.'"${TEST_DOMAIN}"'" /etc/hosts || echo "127.0.0.1 registry.'"${TEST_DOMAIN}"'" >> /etc/hosts'
 
-# ── 4. Run setup.sh non-interactively ─────────────────────────
+# ── 4. Run setup.sh ───────────────────────────────────────────
 blu "Running setup.sh (this pulls images — give it a few minutes)…"
-docker exec -i -e INSTALL_K3S_EXEC='--snapshotter=native' "$CONTAINER" \
-  bash /tmp/k3s-deploy/setup.sh <<EOF
+if [ "$INTERACTIVE" -eq 1 ]; then
+  # You answer the prompts yourself at a real TTY. The registry trust, CoreDNS
+  # rewrite and assertions below are wired to ${TEST_DOMAIN}, so use that domain
+  # for a clean pass; the other answers are free-form.
+  cat <<NOTE
+  Interactive mode — answer setup.sh's prompts yourself. For the checks to pass:
+    • Domain:        ${TEST_DOMAIN}   ← must be this (registry trust + asserts use it)
+    • Email:         anything (e.g. ${TEST_EMAIL})
+    • Registry user: anything (e.g. ${TEST_REG_USER})
+    • Registry pass: anything (e.g. ${TEST_REG_PASS})
+    • Optional prompts (hardening / swap / zsh / motd): answer N
+NOTE
+  docker exec -it -e INSTALL_K3S_EXEC='--snapshotter=native' "$CONTAINER" \
+    bash /tmp/k3s-deploy/setup.sh
+  SETUP_RC=$?
+else
+  docker exec -i -e INSTALL_K3S_EXEC='--snapshotter=native' "$CONTAINER" \
+    bash /tmp/k3s-deploy/setup.sh <<EOF
 ${TEST_DOMAIN}
 ${TEST_EMAIL}
 ${TEST_REG_USER}
@@ -110,7 +129,8 @@ N
 N
 N
 EOF
-SETUP_RC=$?
+  SETUP_RC=$?
+fi
 if [ "$SETUP_RC" -eq 0 ]; then grn "setup.sh exited 0"; else red "setup.sh exited ${SETUP_RC}"; fi
 
 # ── 5. Assertions ─────────────────────────────────────────────

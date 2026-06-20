@@ -1,6 +1,8 @@
 # k3s-deploy
 
-Infrastructure configuration for a self-hosted Kubernetes cluster running on a Hetzner VPS (Ubuntu) with [K3s](https://k3s.io/).
+Making it dead-simple to deploy apps on your own [K3s](https://k3s.io/) cluster.
+
+Infrastructure configuration for a self-hosted Kubernetes cluster running on a Hetzner VPS (Ubuntu) with K3s.
 
 ## What's in this repo
 
