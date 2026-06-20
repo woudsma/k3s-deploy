@@ -12,6 +12,25 @@ Tested on a Hetzner CX23 Ubuntu VPS.
 - **Private registry** — in-cluster container image storage
 - **Kaniko** — in-cluster Docker image builds (no Docker daemon required)
 
+## Installation - initial server setup
+
+After creating a fresh Hetzner VPS with Ubuntu, the guided `setup.sh` script brings the whole cluster up.
+
+**First, point your domain at the server.** Add a DNS A record for `*.<domain>` pointing to the server's IP. The cluster issues wildcard TLS for your subdomains, so this must resolve before setup runs.
+
+Then copy this repo to the server and run `setup.sh`: 
+
+```bash
+rsync -a --exclude='.git' . root@<server-ip>:/tmp/k3s-deploy
+ssh root@<server-ip>
+bash /tmp/k3s-deploy/setup.sh
+```
+This prompts for your domain and registry credentials, replaces the `mysite.com` placeholder repo-wide, and installs everything: K3s, security hardening, cert-manager + Let's Encrypt, the private registry and its pull/push secrets, the git-push deploy system, and the monitoring stack.
+
+When it finishes, the script prints the remaining manual steps — including copying the kubeconfig from `/etc/rancher/k3s/k3s.yaml` to your local `~/.kube/config` (replace `127.0.0.1` with the server IP) for remote `kubectl` access.
+
+See [CLAUDE.md](CLAUDE.md) for a step-by-step breakdown of everything `setup.sh` does.
+
 ## How deployments work
 
 Each app only needs a `helm-values.yaml` to override the helm defaults (seen in `charts/app/`) — no raw Kubernetes manifests required. 
@@ -48,25 +67,6 @@ Two ways to deploy updates:
 2. **GitHub Actions** — CI/CD builds image, pushes to registry, deploys via Helm
 
 See [CLAUDE.md](CLAUDE.md) for full setup instructions, commands, and architecture decisions.
-
-## Initial server setup
-
-After creating a fresh Hetzner VPS with Ubuntu, the guided `setup.sh` script brings the whole cluster up.
-
-**First, point your domain at the server.** Add a DNS A record for `*.<domain>` pointing to the server's IP. The cluster issues wildcard TLS for your subdomains, so this must resolve before setup runs.
-
-Then copy this repo to the server and run `setup.sh`: 
-
-```bash
-rsync -a --exclude='.git' . root@<server-ip>:/tmp/k3s-deploy
-ssh root@<server-ip>
-bash /tmp/k3s-deploy/setup.sh
-```
-This prompts for your domain and registry credentials, replaces the `mysite.com` placeholder repo-wide, and installs everything: K3s, security hardening, cert-manager + Let's Encrypt, the private registry and its pull/push secrets, the git-push deploy system, and the monitoring stack.
-
-When it finishes, the script prints the remaining manual steps — including copying the kubeconfig from `/etc/rancher/k3s/k3s.yaml` to your local `~/.kube/config` (replace `127.0.0.1` with the server IP) for remote `kubectl` access.
-
-See [CLAUDE.md](CLAUDE.md) for a step-by-step breakdown of everything `setup.sh` does.
 
 ## Monitoring
 
