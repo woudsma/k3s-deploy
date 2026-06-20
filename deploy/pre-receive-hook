@@ -15,6 +15,15 @@ export KUBECONFIG="/home/deploy/.kube/config"
 APP_NAME=$(basename "$PWD" | sed 's/\.git$//')
 SAFE_NAME=$(echo "$APP_NAME" | tr '.' '-')
 
+# Prune this app's stale images (node + registry) after a successful rollout.
+# Best-effort — runs via a narrow sudo grant and never fails the deploy.
+prune_old_images() {
+  echo ""
+  echo "▶ Pruning old images..."
+  sudo -n /usr/local/bin/cleanup-old-images "$REGISTRY" "$APP_NAME" "$TAG" 5 \
+    || echo "⚠ Image cleanup skipped (non-fatal)"
+}
+
 # Validate app name — reject anything that could break paths or YAML
 if [[ ! "$APP_NAME" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ ]]; then
   echo "✗ Invalid app name: ${APP_NAME}" >&2
@@ -161,6 +170,7 @@ if [ -f "${CONTEXT_DIR}/helm-values.yaml" ]; then
     sleep 2
   done
   kubectl rollout status "deployment/${DEPLOY_NAME}" -n "$NAMESPACE" --timeout=120s 2>&1
+  prune_old_images
 
 elif [ -d "${CONTEXT_DIR}/k8s" ]; then
   # ── Legacy kubectl deploy ────────────────────────────────────
@@ -198,6 +208,7 @@ elif [ -d "${CONTEXT_DIR}/k8s" ]; then
   echo "▶ Rolling out ${APP_NAME} (deployment/${DEPLOY_NAME})..."
   kubectl set image "deployment/${DEPLOY_NAME}" "${CONTAINER_NAME}=${IMAGE}" -n "$NAMESPACE" 2>&1
   kubectl rollout status "deployment/${DEPLOY_NAME}" -n "$NAMESPACE" --timeout=120s 2>&1
+  prune_old_images
 
 else
   echo "⚠ No helm-values.yaml or k8s/ directory found — image built and pushed, but no deploy performed."

@@ -63,6 +63,26 @@ chmod 755 "${DEPLOY_HOME}/pre-receive-hook"
 chown "$DEPLOY_USER":"$DEPLOY_USER" "${DEPLOY_HOME}/pre-receive-hook"
 echo "  Installed pre-receive hook"
 
+# ── Install image cleanup script + narrow sudo grant ───────────
+if [ -f "${SCRIPT_DIR}/cleanup-old-images.sh" ]; then
+  cp "${SCRIPT_DIR}/cleanup-old-images.sh" /usr/local/bin/cleanup-old-images
+  chown root:root /usr/local/bin/cleanup-old-images
+  chmod 755 /usr/local/bin/cleanup-old-images
+  # Let the unprivileged deploy user run ONLY this one script as root.
+  echo "${DEPLOY_USER} ALL=(root) NOPASSWD: /usr/local/bin/cleanup-old-images" \
+    > /etc/sudoers.d/deploy-cleanup
+  chmod 440 /etc/sudoers.d/deploy-cleanup
+  if visudo -cf /etc/sudoers.d/deploy-cleanup >/dev/null; then
+    echo "  Installed cleanup-old-images + sudo grant"
+  else
+    echo "  Error: invalid sudoers file — removing" >&2
+    rm -f /etc/sudoers.d/deploy-cleanup
+    exit 1
+  fi
+else
+  echo "  Warning: cleanup-old-images.sh not found — old images won't be pruned"
+fi
+
 # ── Write deploy config ───────────────────────────────────────
 cat > "${DEPLOY_HOME}/.deploy.conf" <<EOF
 REGISTRY="${REGISTRY}"

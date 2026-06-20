@@ -61,9 +61,11 @@ See [CLAUDE.md](CLAUDE.md) for full setup instructions, commands, and architectu
 
 ## Initial server setup
 
-After creating a fresh Hetzner VPS with Ubuntu, run through these steps to get the cluster up.
+After creating a fresh Hetzner VPS with Ubuntu, the guided `setup.sh` script brings the whole cluster up.
 
-For a guided setup, copy this repo to the server and run `setup.sh` — it prompts for your domain and registry credentials, then runs all the steps below:
+**First, point your domain at the server.** Add a DNS A record for `*.<domain>` pointing to the server's IP. The cluster issues wildcard TLS for your subdomains, so this must resolve before setup runs.
+
+Then copy this repo to the server and run `setup.sh`. It prompts for your domain and registry credentials, replaces the `mysite.com` placeholder repo-wide, and installs everything: K3s, security hardening, cert-manager + Let's Encrypt, the private registry and its pull/push secrets, the git-push deploy system, and the monitoring stack.
 
 ```bash
 rsync -a --exclude='.git' . root@<server-ip>:/tmp/k8s-setup
@@ -71,59 +73,9 @@ ssh root@<server-ip>
 bash /tmp/k8s-setup/setup.sh
 ```
 
-Or follow the steps manually:
+When it finishes, the script prints the remaining manual steps — including copying the kubeconfig from `/etc/rancher/k3s/k3s.yaml` to your local `~/.kube/config` (replace `127.0.0.1` with the server IP) for remote `kubectl` access.
 
-First:
-
-1. Point your domain to the server — add a DNS A record for `*.<domain>` to the server IP.
-2. If setting up manually (not using `setup.sh`), replace `mysite.com` with your domain across all `.yaml` and `.sh` files, and update the email in `cert-manager/cluster-issuer.yaml`.
-
-```bash
-# 1. Install K3s
-ssh root@<server-ip>
-sudo apt update -y
-curl -sfL https://get.k3s.io | sh -
-
-# 2. Security hardening — key-only auth, firewall
-sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
-systemctl restart ssh
-ufw default deny incoming && ufw default allow outgoing
-ufw allow 22/tcp && ufw allow 80/tcp && ufw allow 443/tcp && ufw allow 6443/tcp
-ufw enable
-apt install fail2ban -y && systemctl enable fail2ban
-
-# 3. Copy this repo to the server
-exit  # back to local machine
-rsync -a --exclude='.git' . root@<server-ip>:/tmp/k8s-setup
-
-# 4. Install cert-manager + ClusterIssuer
-ssh root@<server-ip>
-kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
-kubectl wait --for=condition=available deployment --all -n cert-manager --timeout=120s
-kubectl apply -f /tmp/k8s-setup/cert-manager/cluster-issuer.yaml
-
-# 5. Deploy the private registry
-kubectl create namespace registry
-apt install apache2-utils -y
-htpasswd -Bc registry-htpasswd <username>
-kubectl create secret generic registry-auth --from-file=htpasswd=registry-htpasswd -n registry
-kubectl apply -f /tmp/k8s-setup/registry/registry.yaml
-
-# 6. Create secrets for Kaniko and image pulling
-echo '{"auths":{"registry.<domain>":{"username":"<user>","password":"<pass>"}}}' > /tmp/docker-config.json
-kubectl create secret generic kaniko-docker-config \
-  --from-file=config.json=/tmp/docker-config.json
-rm /tmp/docker-config.json
-kubectl create secret docker-registry kaniko-registry-creds \
-  --docker-server=registry.<domain> --docker-username=<user> --docker-password=<pass>
-
-# 7. Set up git-push deploys (copies Helm chart, creates deploy user, etc.)
-bash /tmp/k8s-setup/deploy/setup-deploy.sh "$(cat ~/.ssh/authorized_keys)"
-```
-
-Copy the kubeconfig from `/etc/rancher/k3s/k3s.yaml` to your local `~/.kube/config` (replace `127.0.0.1` with the server IP) for remote `kubectl` access.
-
-See [CLAUDE.md](CLAUDE.md) for detailed explanations of each step.
+See [CLAUDE.md](CLAUDE.md) for a step-by-step breakdown of everything `setup.sh` does.
 
 ## Monitoring
 

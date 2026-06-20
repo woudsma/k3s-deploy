@@ -58,6 +58,7 @@ Self-hosted Kubernetes cluster on a Hetzner VPS using K3s. The cluster runs pers
 - Repos are auto-created on first push (no manual setup per app)
 - A `pre-receive` hook archives the code, creates a Kaniko Job with a `hostPath` volume, streams build logs back over SSH, and rolls out the deployment
 - Works without GitHub — code goes directly from local to server
+- After a successful rollout the hook runs `cleanup-old-images.sh` (via a narrow `deploy` sudo grant) to prune that app's stale per-commit images — keeps the running tag + `latest` on the node, and the 5 newest tags + `latest` in the registry, then runs registry GC. Without this, every push leaves an orphaned image and the disk slowly fills.
 
 ### Templating: Helm
 
@@ -87,9 +88,10 @@ k8s/
 │           ├── ingress.yaml
 │           └── pvc.yaml
 ├── deploy/
-│   ├── setup-deploy.sh     # Run on server to set up git-push deploys + Helm
-│   ├── deploy-shell         # Custom shell for the deploy user
-│   └── pre-receive-hook     # Shared hook: Kaniko build + Helm deploy
+│   ├── setup-deploy.sh        # Run on server to set up git-push deploys + Helm
+│   ├── deploy-shell           # Custom shell for the deploy user
+│   ├── cleanup-old-images.sh  # Prunes stale node + registry images post-deploy
+│   └── pre-receive-hook       # Shared hook: Kaniko build + Helm deploy + prune
 ├── examples/               # Example helm-values.yaml files per app type
 ├── monitoring/
 │   ├── headlamp.yaml       # Lightweight K8s dashboard (headlamp.mysite.com)
