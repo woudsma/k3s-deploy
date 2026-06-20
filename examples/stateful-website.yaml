@@ -1,0 +1,62 @@
+# Stateful website — a web app that bundles its own storage (e.g. a SPA backed
+# by an embedded SQLite db and uploaded files on one persistent volume).
+#
+# One-time on the server, create the secret BEFORE the first deploy:
+#   kubectl create secret generic my-app-secrets \
+#     --from-literal=API_TOKEN=$(openssl rand -hex 24) \
+#     --from-literal=ADMIN_TOKEN=$(openssl rand -hex 24)
+
+name: my-app
+
+# App listens on 8080; the Service exposes 80 and forwards to it.
+port: 8080
+
+terminationGracePeriodSeconds: 10
+
+ingress:
+  enabled: true
+  hosts:
+    - my-app.mysite.com
+    - www.my-app.mysite.com
+  annotations: {}
+
+# The db file + any uploads live on one persistent volume mounted at /data.
+persistence:
+  enabled: true
+  size: 5Gi
+  mountPath: /data
+
+# Single writer holding a ReadWriteOnce volume — Recreate avoids two pods racing
+# for the mount during a rollout.
+strategy: Recreate
+
+# Health check hits a lightweight JSON endpoint, not the SPA.
+probes:
+  type: http
+  path: /healthz
+  initialDelaySeconds: 5
+  periodSeconds: 5
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 96Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+env:
+  - name: DATA_DIR
+    value: /data
+  - name: TZ
+    value: Europe/Amsterdam
+  - name: API_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: my-app-secrets
+        key: API_TOKEN
+  - name: ADMIN_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: my-app-secrets
+        key: ADMIN_TOKEN

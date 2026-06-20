@@ -19,6 +19,7 @@ Each `.yaml` file is a complete example of a `helm-values.yaml` — the only Kub
 | `api.yaml` | Node.js / Python API | Port 3000, health probe, env vars, bigger resources |
 | `websocket.yaml` | WebSocket app | Like API + Traefik sticky session annotation |
 | `multi-domain.yaml` | Multi-domain site | Two hostnames (apex + www) |
+| `stateful-website.yaml` | Stateful web app | Persistent volume + secrets, Recreate strategy, custom port |
 | `database.yaml` | PostgreSQL | Public image, no ingress, persistent volume, exec probe |
 | `redis.yaml` | Redis | Public image, no ingress, persistent volume, exec probe |
 | `environments/` | Multi-env | Per-environment values for dev, test, and prod |

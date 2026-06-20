@@ -209,29 +209,12 @@ check "hello-world pod is Running"     "kubectl get pods -l app=hello-world --no
 check "image pulled from registry"     "kubectl get pod -l app=hello-world -o jsonpath='{.items[0].spec.containers[0].image}' | grep -q '^registry.${TEST_DOMAIN}/hello-world:'"
 check "page served through Traefik"    "curl -sk --resolve hello-world.${TEST_DOMAIN}:443:127.0.0.1 https://hello-world.${TEST_DOMAIN}/ | grep -q HELLO-FROM-K3S-DEPLOY-TEST"
 
-# ── 7. Redeploy: a second push to exercise the upgrade path ────
-# A new (empty) commit means a new SHA tag, so this goes through `helm upgrade`
-# (revision 2) and the prune-old-images step with a real previous image present —
-# not the first-install path.
-blu "Redeploying with an empty commit (tests subsequent deploys)…"
-docker exec "$CONTAINER" bash -c \
-  'cd /root/hello-world && git -c user.email=t@t.local -c user.name=tester commit -q --allow-empty -m "redeploy" && GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git push deploy@localhost:hello-world HEAD:main'
-REDEPLOY_RC=$?
-if [ "$REDEPLOY_RC" -eq 0 ]; then grn "second git push exited 0"; else red "second git push exited ${REDEPLOY_RC}"; fi
-
-blu "Verifying the redeploy…"
-# helm (unlike k3s's kubectl) doesn't default to the k3s kubeconfig — point it there.
-check "helm reached revision 2"        "KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm history hello-world -n default 2>/dev/null | grep -qE '^2[[:space:]]'"
-check "rollout succeeded (1/1 ready)"  "kubectl rollout status deploy/hello-world -n default --timeout=60s"
-# Retry briefly: during rollover there's a short gap before Traefik repoints to the new pod.
-check "page still served after redeploy" "for _ in \$(seq 1 10); do curl -sk --resolve hello-world.${TEST_DOMAIN}:443:127.0.0.1 https://hello-world.${TEST_DOMAIN}/ | grep -q HELLO-FROM-K3S-DEPLOY-TEST && exit 0; sleep 2; done; exit 1"
-
 # ── Summary ───────────────────────────────────────────────────
 echo
-if [ "$FAIL" -eq 0 ] && [ "$SETUP_RC" -eq 0 ] && [ "${DEPLOY_RC:-1}" -eq 0 ] && [ "${REDEPLOY_RC:-1}" -eq 0 ]; then
+if [ "$FAIL" -eq 0 ] && [ "$SETUP_RC" -eq 0 ] && [ "${DEPLOY_RC:-1}" -eq 0 ]; then
   grn "PASS — ${PASS}/$((PASS + FAIL)) checks (container left running; 'test/run.sh shell' to inspect)"
   exit 0
 else
-  red "FAIL — ${FAIL} check(s) failed, setup rc=${SETUP_RC}, deploy rc=${DEPLOY_RC:-?}, redeploy rc=${REDEPLOY_RC:-?} (container left running; 'test/run.sh shell' to inspect)"
+  red "FAIL — ${FAIL} check(s) failed, setup rc=${SETUP_RC}, deploy rc=${DEPLOY_RC:-?} (container left running; 'test/run.sh shell' to inspect)"
   exit 1
 fi

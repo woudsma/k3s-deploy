@@ -126,7 +126,7 @@ Ubuntu container that stands in for a fresh Hetzner VPS, asserts the cluster cam
 sudoers, domain replacement), then does a **real `git push` deploy** of the
 `test/hello-world/` static app — exercising the full pipeline (Kaniko build → push to
 the private registry → Helm deploy → reachable through Traefik) with the build logs
-streaming back. 19 checks total. Requires Docker running.
+streaming back. 16 checks total. Requires Docker running.
 
 ```bash
 test/run.sh          # build base image (once), run setup.sh + sample deploy, assert
