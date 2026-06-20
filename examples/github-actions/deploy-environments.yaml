@@ -15,7 +15,7 @@ on:
 env:
   APP_NAME: my-app
   REGISTRY: registry.mysite.com
-  CHART_REPO: username/k8s
+  CHART_REPO: username/k3s-deploy
 
 jobs:
   build:

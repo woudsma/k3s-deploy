@@ -1,4 +1,4 @@
-# k8s
+# k3s-deploy
 
 Infrastructure configuration for a self-hosted Kubernetes cluster running on a Hetzner VPS (Ubuntu) with [K3s](https://k3s.io/).
 
@@ -68,9 +68,9 @@ After creating a fresh Hetzner VPS with Ubuntu, the guided `setup.sh` script bri
 Then copy this repo to the server and run `setup.sh`. It prompts for your domain and registry credentials, replaces the `mysite.com` placeholder repo-wide, and installs everything: K3s, security hardening, cert-manager + Let's Encrypt, the private registry and its pull/push secrets, the git-push deploy system, and the monitoring stack.
 
 ```bash
-rsync -a --exclude='.git' . root@<server-ip>:/tmp/k8s-setup
+rsync -a --exclude='.git' . root@<server-ip>:/tmp/k3s-deploy
 ssh root@<server-ip>
-bash /tmp/k8s-setup/setup.sh
+bash /tmp/k3s-deploy/setup.sh
 ```
 
 When it finishes, the script prints the remaining manual steps — including copying the kubeconfig from `/etc/rancher/k3s/k3s.yaml` to your local `~/.kube/config` (replace `127.0.0.1` with the server IP) for remote `kubectl` access.

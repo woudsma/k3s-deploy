@@ -6,7 +6,7 @@ Two workflow options for deploying from GitHub Actions.
 
 Builds the Docker image on the GitHub Actions runner, pushes it to the private registry, then deploys using `helm upgrade --install` with the project's `helm-values.yaml`.
 
-The chart is checked out from this repo (`username/k8s`) during the workflow — update `CHART_REPO` in the workflow if your repo path differs.
+The chart is checked out from this repo (`username/k3s-deploy`) during the workflow — update `CHART_REPO` in the workflow if your repo path differs.
 
 **Repo secrets:**
 

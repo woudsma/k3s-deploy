@@ -2,9 +2,9 @@
 # setup.sh — Interactive server setup for the K8s cluster.
 #
 # Run this on a fresh Ubuntu VPS after rsync'ing this repo:
-#   rsync -a --exclude='.git' . root@<server-ip>:/tmp/k8s-setup
+#   rsync -a --exclude='.git' . root@<server-ip>:/tmp/k3s-deploy
 #   ssh root@<server-ip>
-#   bash /tmp/k8s-setup/setup.sh
+#   bash /tmp/k3s-deploy/setup.sh
 #
 # Or just run the manual steps in the README — this script does the same thing.
 

@@ -74,7 +74,7 @@ Self-hosted Kubernetes cluster on a Hetzner VPS using K3s. The cluster runs pers
 ## Repo Structure
 
 ```
-k8s/
+k3s-deploy/
 ├── cert-manager/
 │   └── cluster-issuer.yaml # Let's Encrypt ClusterIssuer (letsencrypt-prod)
 ├── charts/
@@ -149,7 +149,7 @@ Add a wildcard DNS A record for `*.<domain>` pointing to the server IP.
 
 ```bash
 # From your local machine
-rsync -a --exclude='.git' . root@<server-ip>:/tmp/k8s-setup
+rsync -a --exclude='.git' . root@<server-ip>:/tmp/k3s-deploy
 ```
 
 ### 6. Install cert-manager
@@ -157,7 +157,7 @@ rsync -a --exclude='.git' . root@<server-ip>:/tmp/k8s-setup
 ```bash
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
 kubectl wait --for=condition=available deployment --all -n cert-manager --timeout=120s
-kubectl apply -f /tmp/k8s-setup/cert-manager/cluster-issuer.yaml
+kubectl apply -f /tmp/k3s-deploy/cert-manager/cluster-issuer.yaml
 ```
 
 ### 7. Deploy the private registry
@@ -172,7 +172,7 @@ kubectl create secret generic registry-auth \
   --from-file=htpasswd=registry-htpasswd \
   -n registry
 
-kubectl apply -f /tmp/k8s-setup/registry/registry.yaml
+kubectl apply -f /tmp/k3s-deploy/registry/registry.yaml
 ```
 
 ### 8. Create registry pull/push secrets
@@ -198,7 +198,7 @@ kubectl create secret generic git-credentials \
 ### 9. Deploy Headlamp dashboard
 
 ```bash
-kubectl apply -f /tmp/k8s-setup/monitoring/headlamp.yaml
+kubectl apply -f /tmp/k3s-deploy/monitoring/headlamp.yaml
 
 # Create a long-lived token to log in
 kubectl create token headlamp -n headlamp --duration=8760h
@@ -210,7 +210,7 @@ Visit `headlamp.mysite.com` and paste the token to log in.
 
 ```bash
 # Run the setup script (repo was copied in step 5)
-bash /tmp/k8s-setup/deploy/setup-deploy.sh "$(cat ~/.ssh/authorized_keys)"
+bash /tmp/k3s-deploy/deploy/setup-deploy.sh "$(cat ~/.ssh/authorized_keys)"
 ```
 
 This creates a `deploy` user, installs Helm, copies the Helm chart to `/opt/helm-charts/app/`, installs the custom shell and pre-receive hook, copies the kubeconfig, and sets up your SSH key. Repos are auto-created on first push.
