@@ -10,6 +10,15 @@ When adding a new component/service to the cluster:
 4. Update the repo structure tree in this file
 5. Update `README.md` if it affects the user-facing docs
 
+## Shell scripts
+
+**Always run `shellcheck` on any shell script you change and resolve the findings**
+(fix them, or suppress with a `# shellcheck disable=SCxxxx` line plus a comment saying
+why) before considering the change done. Intentional patterns — e.g. the deliberate
+word-splitting in `deploy/pre-receive-hook` or the mtime-ordered `ls` in
+`deploy/cleanup-old-images.sh` — must carry such a justified disable directive so the
+scripts stay shellcheck-clean.
+
 ## Overview
 
 Self-hosted Kubernetes cluster on a Hetzner VPS using K3s. The cluster runs personal websites, APIs, and databases with automatic SSL, a private container registry, and a build service for Dokku-like deployments.

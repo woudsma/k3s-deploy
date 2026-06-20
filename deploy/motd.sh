@@ -21,8 +21,42 @@ YELLOW='\033[0;33m'
 CYAN='\033[0;36m'
 RESET='\033[0m'
 
+# ── help: a quick-start guide for this VPS (overrides the bash builtin) ─────────
+# Defined for interactive shells so `help` shows how to deploy, reach Headlamp, etc.
+help() {
+  local ip domain
+  ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+  domain="mysite.com"  # replaced by setup.sh
+  cat <<EOF
+
+$(echo -e "${BOLD}${CYAN}K3s cluster — quick start${RESET}")
+
+$(echo -e "${BOLD}1. Deploy an app from your laptop${RESET}")  (Dokku-style: just git push)
+   In your project (needs a Dockerfile + helm-values.yaml):
+     git remote add deploy deploy@${ip}:my-app
+     git push deploy main
+   The first push auto-creates the app; build logs stream back in your terminal.
+
+$(echo -e "${BOLD}2. Open the Headlamp dashboard${RESET}")
+     https://headlamp.${domain}
+   Generate a login token:
+     kubectl create token headlamp -n headlamp --duration=8760h
+
+$(echo -e "${BOLD}3. Handy commands${RESET}")
+     k get pods -A           # 'k' is aliased to kubectl
+     helm rollback <app>     # undo a bad deploy (back to the previous release)
+     kubectl logs -f job/build-<app>-<sha>   # follow a running build
+
+$(echo -e "${DIM}Tip: this status screen prints on login — re-run it anytime with 'motd'.${RESET}")
+
+EOF
+}
+# Re-run the status banner on demand.
+alias motd='source /etc/profile.d/k8s-motd.sh'
+
 echo ""
 echo -e "${BOLD}${CYAN}── K3s Cluster Status ──────────────────────────────${RESET}"
+echo -e "${DIM}Type 'help' for a quick start guide (deploy, Headlamp, tips).${RESET}"
 echo ""
 
 # ── System resources ───────────────────────────────────────────
@@ -72,18 +106,20 @@ echo ""
 if ! command -v kubectl &>/dev/null; then
   echo -e "  ${DIM}kubectl not found${RESET}"
   echo ""
+  # shellcheck disable=SC2317  # `exit 0` is reached only if run directly, not sourced
   return 2>/dev/null || exit 0
 fi
 
 if ! kubectl cluster-info &>/dev/null 2>&1; then
   echo -e "  ${RED}Cluster unreachable${RESET}"
   echo ""
+  # shellcheck disable=SC2317  # `exit 0` is reached only if run directly, not sourced
   return 2>/dev/null || exit 0
 fi
 
 # Node status
 echo -e "${BOLD}Nodes${RESET}"
-kubectl get nodes --no-headers 2>/dev/null | while read -r name state roles age version; do
+kubectl get nodes --no-headers 2>/dev/null | while read -r name state _ age version; do
   if [[ "$state" == "Ready" ]]; then
     echo -e "  ${GREEN}●${RESET} ${name}  ${state}  ${DIM}${age}  ${version}${RESET}"
   else
@@ -148,7 +184,7 @@ pvcs=$(kubectl get pvc --all-namespaces --no-headers 2>/dev/null)
 if [ -z "$pvcs" ]; then
   echo -e "  ${DIM}No PVCs found${RESET}"
 else
-  echo "$pvcs" | while read -r ns name state volume capacity access sc age; do
+  echo "$pvcs" | while read -r ns name state _ capacity _ _ age; do
     if [[ "$state" == "Bound" ]]; then
       echo -e "  ${GREEN}●${RESET} ${ns}/${name}  ${capacity}  ${DIM}${state}${RESET}"
     else
@@ -165,7 +201,7 @@ if command -v helm &>/dev/null; then
   if [ -z "$releases" ]; then
     echo -e "  ${DIM}No releases${RESET}"
   else
-    echo "$releases" | while read -r name ns revision updated state chart app_version; do
+    echo "$releases" | while read -r name ns revision _ state chart _; do
       if [[ "$state" == "deployed" ]]; then
         echo -e "  ${GREEN}●${RESET} ${name}  ${DIM}${ns}  rev ${revision}  ${chart}${RESET}"
       else

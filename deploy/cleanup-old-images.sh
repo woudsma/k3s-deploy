@@ -46,13 +46,19 @@ done < <("${CRICTL[@]}" images 2>/dev/null | awk -v repo="${REGISTRY}/${APP}" '$
 [ "$node_removed" -eq 0 ] && echo "  node images already clean"
 
 # ── 2. Registry: prune old tags, then garbage-collect ──────────────────────────
-REPOS_DIR=$(ls -d /var/lib/rancher/k3s/storage/pvc-*_registry_registry-pvc/docker/registry/v2/repositories 2>/dev/null | head -1)
+REPOS_DIR=""
+for _d in /var/lib/rancher/k3s/storage/pvc-*_registry_registry-pvc/docker/registry/v2/repositories; do
+  [ -d "$_d" ] && { REPOS_DIR="$_d"; break; }   # skips the literal glob when no match
+done
 TAGS_DIR="${REPOS_DIR:-/nonexistent}/${APP}/_manifests/tags"
 
 reg_deleted=0
 if [ -d "$TAGS_DIR" ]; then
   kept_others=0
   # ls -t lists tags newest-first by mtime (each SHA tag is written once on push).
+  # A glob can't sort by mtime, and tag names are git SHAs/"latest" (no spaces),
+  # so iterating ls output is safe here.
+  # shellcheck disable=SC2045
   for tag in $(ls -1t "$TAGS_DIR" 2>/dev/null); do
     case "$tag" in
       "$CURRENT_TAG" | latest) continue ;;   # always retained, never counted
