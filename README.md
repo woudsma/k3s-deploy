@@ -2,8 +2,6 @@
 
 Making it dead-simple to deploy apps on your own [K3s](https://k3s.io/) cluster.
 
-Infrastructure configuration for a self-hosted Kubernetes cluster running on a Hetzner VPS (Ubuntu) with K3s.
-
 ## What's in this repo
 
 | Directory | Description |
@@ -26,7 +24,7 @@ Infrastructure configuration for a self-hosted Kubernetes cluster running on a H
 
 ## How deployments work
 
-A single Helm chart (`charts/app/`) provides templates for Deployment, Service, Ingress, and PVC. Each app only needs a `helm-values.yaml` to override the defaults — no raw Kubernetes manifests required.
+Each app only needs a `helm-values.yaml` to override the helm defaults (seen in `charts/app/`) — no raw Kubernetes manifests required. 
 
 ```
 my-app/
