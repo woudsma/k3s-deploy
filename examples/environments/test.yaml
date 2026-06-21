@@ -1,7 +1,6 @@
 # Test environment — mirrors prod settings at lower scale.
 
 name: my-app
-namespace: test
 
 replicas: 1
 

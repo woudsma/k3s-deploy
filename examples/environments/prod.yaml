@@ -1,7 +1,6 @@
 # Prod environment — higher resources, multiple replicas, stricter probes.
 
 name: my-app
-namespace: prod
 
 replicas: 2
 

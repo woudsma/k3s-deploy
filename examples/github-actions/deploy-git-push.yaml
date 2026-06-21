@@ -6,7 +6,6 @@ on:
 
 env:
   APP_NAME: my-app
-  DEPLOY_HOST: deploy@<SERVER_IP>
 
 jobs:
   deploy:
@@ -25,5 +24,5 @@ jobs:
 
       - name: Push to server
         run: |
-          git remote add deploy $DEPLOY_HOST:$APP_NAME
+          git remote add deploy deploy@${{ secrets.SERVER_IP }}:$APP_NAME
           git push deploy main --force

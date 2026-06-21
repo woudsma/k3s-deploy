@@ -49,6 +49,9 @@ jobs:
           repository: ${{ env.CHART_REPO }}
           path: k8s-charts
           sparse-checkout: charts/app
+          # If CHART_REPO is private, the default token can't read it — pass a
+          # PAT with read access. Not needed if the chart repo is public.
+          # token: ${{ secrets.CHART_REPO_TOKEN }}
 
       - name: Deploy to dev
         run: |
@@ -74,6 +77,9 @@ jobs:
           repository: ${{ env.CHART_REPO }}
           path: k8s-charts
           sparse-checkout: charts/app
+          # If CHART_REPO is private, the default token can't read it — pass a
+          # PAT with read access. Not needed if the chart repo is public.
+          # token: ${{ secrets.CHART_REPO_TOKEN }}
 
       - name: Deploy to test
         run: |
@@ -99,6 +105,9 @@ jobs:
           repository: ${{ env.CHART_REPO }}
           path: k8s-charts
           sparse-checkout: charts/app
+          # If CHART_REPO is private, the default token can't read it — pass a
+          # PAT with read access. Not needed if the chart repo is public.
+          # token: ${{ secrets.CHART_REPO_TOKEN }}
 
       - name: Deploy to prod
         run: |

@@ -1,7 +1,6 @@
 # Dev environment — relaxed resources, single replica, debug logging.
 
 name: my-app
-namespace: dev
 
 replicas: 1
 
