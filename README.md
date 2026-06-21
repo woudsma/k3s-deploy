@@ -29,7 +29,7 @@ This prompts for your domain and registry credentials, replaces the `mysite.com`
 
 When it finishes, the script prints the remaining manual steps — including copying the kubeconfig from `/etc/rancher/k3s/k3s.yaml` to your local `~/.kube/config` (replace `127.0.0.1` with the server IP) for remote `kubectl` access.
 
-See [CLAUDE.md](CLAUDE.md) for a step-by-step breakdown of everything `setup.sh` does.
+See [CLAUDE.md](CLAUDE.md#cluster-setup-commands) for a step-by-step breakdown of everything `setup.sh` does.
 
 ## How deployments work
 
