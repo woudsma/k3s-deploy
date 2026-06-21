@@ -18,9 +18,10 @@ After creating a fresh Hetzner VPS with Ubuntu, the guided `setup.sh` script bri
 
 **First, point your domain at the server.** Add a DNS A record for `*.<domain>` pointing to the server's IP. The cluster issues wildcard TLS for your subdomains, so this must resolve before setup runs.
 
-Then copy this repo to the server and run `setup.sh`: 
+Clone this repo to your local machine, then `rsync` it to the server and run `setup.sh`: 
 
 ```bash
+cd k3s-deploy
 rsync -a --exclude='.git' . root@<server-ip>:/tmp/k3s-deploy
 ssh root@<server-ip>
 bash /tmp/k3s-deploy/setup.sh
