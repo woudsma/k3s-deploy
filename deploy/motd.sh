@@ -21,6 +21,18 @@ YELLOW='\033[0;33m'
 CYAN='\033[0;36m'
 RESET='\033[0m'
 
+# bar PERCENT COLOR — render a fixed-width [####----] meter colored by COLOR.
+bar() {
+  local pct="$1" color="$2" width=20 filled empty
+  filled=$(( pct * width / 100 ))
+  [ "$filled" -gt "$width" ] && filled="$width"
+  [ "$filled" -lt 0 ] && filled=0
+  empty=$(( width - filled ))
+  printf '%b[%b%s%b%s]%b' \
+    "$color" "$color" "$(printf '%*s' "$filled" '' | tr ' ' '#')" \
+    "$DIM" "$(printf '%*s' "$empty" '' | tr ' ' '-')" "$RESET"
+}
+
 # ── help: a quick-start guide for this VPS (overrides the bash builtin) ─────────
 # Defined for interactive shells so `help` shows how to deploy, reach Headlamp, etc.
 help() {
@@ -73,7 +85,7 @@ if [ -n "$disk_pct" ]; then
   else
     disk_color="$GREEN"
   fi
-  echo -e "  Disk:   ${disk_color}${disk_usage}${RESET}"
+  echo -e "  Disk:   $(bar "$disk_pct" "$disk_color") ${disk_color}${disk_usage}${RESET}"
 fi
 
 # RAM
@@ -87,7 +99,7 @@ if [ -n "$mem_pct" ]; then
   else
     mem_color="$GREEN"
   fi
-  echo -e "  RAM:    ${mem_color}${mem_used} / ${mem_total} (${mem_pct}% used, ${mem_avail} available)${RESET}"
+  echo -e "  RAM:    $(bar "$mem_pct" "$mem_color") ${mem_color}${mem_used} / ${mem_total} (${mem_pct}% used, ${mem_avail} available)${RESET}"
 fi
 
 # Load average
