@@ -16,7 +16,7 @@ Tested on a Hetzner CX23 Ubuntu VPS.
 
 After creating a fresh Hetzner VPS with Ubuntu, the guided `setup.sh` script brings the whole cluster up.
 
-**First, point your domain at the server.** Add a DNS A record for `*.<domain>` pointing to the server's IP. The cluster issues wildcard TLS for your subdomains, so this must resolve before setup runs.
+**First, point your domain at the server.** Add a wildcard DNS A record for `*.<domain>` pointing to the server's IP, so any subdomain you deploy resolves without adding a new record each time. cert-manager then issues (and auto-renews) an individual TLS certificate per subdomain via the HTTP-01 challenge, so this must resolve before setup runs.
 
 Clone this repo to your local machine, then `rsync` it to the server and run `setup.sh`: 
 
