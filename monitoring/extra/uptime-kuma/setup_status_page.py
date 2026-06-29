@@ -18,8 +18,9 @@ import os
 
 from uptime_kuma_api import UptimeKumaApi
 
-from kuma_common import config
+from kuma_common import config, load_env
 
+load_env()
 SLUG = os.environ.get("STATUS_SLUG", "services")
 TITLE = os.environ.get("STATUS_TITLE", "Service Status")
 DOMAIN = os.environ.get("STATUS_DOMAIN", "status.mysite.com")
