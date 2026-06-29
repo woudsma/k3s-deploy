@@ -18,6 +18,9 @@
 #     scrapeconfigs.monitoring.coreos.com servicemonitors.monitoring.coreos.com \
 #     thanosrulers.monitoring.coreos.com
 
+# Shorten all generated resource names (avoids 80-char PVC names).
+fullnameOverride: prom
+
 # -- Grafana --
 grafana:
   enabled: true
@@ -57,6 +60,8 @@ prometheus:
         memory: 1Gi
     storageSpec:
       volumeClaimTemplate:
+        metadata:
+          name: db
         spec:
           accessModes: ["ReadWriteOnce"]
           resources:
