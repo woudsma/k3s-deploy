@@ -104,7 +104,17 @@ k3s-deploy/
 ├── examples/               # Example helm-values.yaml files per app type
 ├── monitoring/
 │   ├── headlamp.yaml       # Lightweight K8s dashboard (headlamp.mysite.com)
-│   └── trivy-scan.yaml     # Daily image vulnerability scanner (CronJob)
+│   ├── trivy-scan.yaml     # Daily image vulnerability scanner (CronJob)
+│   └── extra/              # Optional monitoring add-ons (see extra/README.md)
+│       ├── README.md
+│       ├── kube-prometheus-stack/
+│       │   └── values.yaml # Lightweight Prometheus + Grafana (own namespace)
+│       └── uptime-kuma/
+│           ├── helm-values.yaml
+│           ├── add_monitors.py
+│           ├── setup_status_page.py
+│           ├── kuma_common.py
+│           └── .env.example
 ├── registry/
 │   └── registry.yaml       # Private registry: Deployment, PVC, Service, Ingress
 ├── test/

@@ -1,0 +1,103 @@
+# kube-prometheus-stack — lightweight config for a single-node k3s cluster.
+#
+# Install into a dedicated "monitoring" namespace for easy removal:
+#   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+#   helm repo update
+#   kubectl create namespace monitoring
+#   helm upgrade --install kube-prometheus monitoring/extra/kube-prometheus-stack \
+#     prometheus-community/kube-prometheus-stack \
+#     -n monitoring -f monitoring/extra/kube-prometheus-stack/values.yaml
+#
+# To remove completely:
+#   helm uninstall kube-prometheus -n monitoring
+#   kubectl delete namespace monitoring
+#   kubectl delete crd alertmanagerconfigs.monitoring.coreos.com \
+#     alertmanagers.monitoring.coreos.com podmonitors.monitoring.coreos.com \
+#     probes.monitoring.coreos.com prometheusagents.monitoring.coreos.com \
+#     prometheuses.monitoring.coreos.com prometheusrules.monitoring.coreos.com \
+#     scrapeconfigs.monitoring.coreos.com servicemonitors.monitoring.coreos.com \
+#     thanosrulers.monitoring.coreos.com
+
+# -- Grafana --
+grafana:
+  enabled: true
+  adminPassword: changeme  # override at install time or use --set
+  ingress:
+    enabled: true
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+    hosts:
+      - grafana.mysite.com
+    tls:
+      - secretName: grafana-tls
+        hosts:
+          - grafana.mysite.com
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+  persistence:
+    enabled: true
+    size: 2Gi
+
+# -- Prometheus --
+prometheus:
+  prometheusSpec:
+    retention: 7d            # short retention — this is a trial
+    retentionSize: 5GB
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: 1Gi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+    # Reduce scrape frequency to save CPU/RAM on a single node
+    scrapeInterval: 60s
+    evaluationInterval: 60s
+
+# -- Alertmanager --
+# Disable for now — alerts can be added later if needed.
+alertmanager:
+  enabled: false
+
+# -- Node exporter --
+nodeExporter:
+  enabled: true
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+# -- kube-state-metrics --
+kube-state-metrics:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+# -- Prometheus Operator --
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi

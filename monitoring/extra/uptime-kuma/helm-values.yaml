@@ -1,0 +1,55 @@
+# Uptime Kuma — lightweight uptime/status monitoring for the k3s cluster.
+# Deployed with the generic k3s-deploy chart (/opt/helm-charts/app):
+#   helm upgrade --install uptime-kuma /opt/helm-charts/app \
+#     -n default -f helm-values.yaml
+#
+# Public Docker Hub image, so no registry pull secret. State lives in a PVC
+# (SQLite at /app/data) on the local-path storage class.
+name: uptime-kuma
+
+image:
+  registry: docker.io
+  repository: louislam/uptime-kuma
+  tag: "1"          # pinned to the v1 stable line
+  pullSecrets: false # public image, skip the private-registry creds
+
+port: 3001          # Uptime Kuma listens on 3001
+
+service:
+  port: 80          # ingress -> service:80 -> container:3001
+  targetPort: 3001
+
+ingress:
+  enabled: true
+  hosts:
+    - uptime.mysite.com   # dashboard / admin UI
+    - status.mysite.com   # public status page (mapped in-app via domainNameList)
+
+# Uptime Kuma's "/" returns a 302 redirect, which k8s httpGet treats as healthy.
+probes:
+  type: http
+  path: /
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 3
+  startup: true
+  startupPeriodSeconds: 3
+  startupFailureThreshold: 30  # ~90s to boot
+
+# Node app: idles ~80-120Mi. Give headroom on the limit.
+resources:
+  requests:
+    cpu: 25m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+# Persist the SQLite DB + config across restarts/redeploys.
+persistence:
+  enabled: true
+  size: 2Gi
+  mountPath: /app/data
+
+# A redeploy must release the volume before the new pod mounts it (RWO).
+strategy: Recreate
