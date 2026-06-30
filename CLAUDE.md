@@ -104,7 +104,6 @@ k3s-deploy/
 ├── examples/               # Example helm-values.yaml files per app type
 ├── monitoring/
 │   ├── headlamp.yaml       # Lightweight K8s dashboard (headlamp.mysite.com)
-│   ├── trivy-scan.yaml     # Daily image vulnerability scanner (CronJob)
 │   └── extra/              # Optional monitoring add-ons (see extra/README.md)
 │       ├── README.md
 │       ├── kube-prometheus-stack/
@@ -390,11 +389,19 @@ helm template <app> charts/app -f helm-values.yaml
 # Helm: roll back to previous version
 helm rollback <app> -n default
 
-# Trivy: view latest scan results
-kubectl logs -l app=trivy-scan --tail=100
+# Trivy Operator: list vulnerability reports (one per workload)
+kubectl get vulnerabilityreports -n default
 
-# Trivy: run a scan manually
-kubectl create job --from=cronjob/trivy-scan trivy-scan-manual
+# Trivy Operator: vulnerability summary for all apps at once (critical/high per workload)
+kubectl get vulnerabilityreports -n default -o custom-columns=\
+'WORKLOAD:.metadata.labels.trivy-operator\.resource\.name,IMAGE:.report.artifact.repository,'\
+'CRITICAL:.report.summary.criticalCount,HIGH:.report.summary.highCount'
+
+# Trivy Operator: full CVE detail for one report
+kubectl describe vulnerabilityreport -n default <name>
+
+# Trivy Operator: re-scan a workload (delete its report; operator regenerates it)
+kubectl delete vulnerabilityreport -n default <name>
 
 # Headlamp: generate a new login token
 kubectl create token headlamp -n headlamp --duration=8760h

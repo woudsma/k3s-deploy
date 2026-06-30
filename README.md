@@ -83,13 +83,26 @@ Deployed automatically by `setup.sh`. To generate a login token:
 kubectl create token headlamp -n headlamp --duration=8760h
 ```
 
-### Trivy (vulnerability scanning)
+### Trivy Operator (vulnerability scanning)
 
-Daily CronJob that scans all running images for HIGH/CRITICAL vulnerabilities. View results:
+Continuously scans every workload's image (any language — Node, Python, Go, …) for
+HIGH/CRITICAL vulnerabilities and publishes the results as `VulnerabilityReport`
+resources. View them:
 
 ```bash
-kubectl logs -l app=trivy-scan --tail=100
+# One report per workload, with critical/high counts
+kubectl get vulnerabilityreports -n default
+
+# Summary table for all apps at once (critical/high per workload)
+kubectl get vulnerabilityreports -n default -o custom-columns=\
+'WORKLOAD:.metadata.labels.trivy-operator\.resource\.name,IMAGE:.report.artifact.repository,'\
+'CRITICAL:.report.summary.criticalCount,HIGH:.report.summary.highCount'
+
+# Full CVE detail for a single report
+kubectl describe vulnerabilityreport -n default <name>
 ```
+
+Reports also show up in the Headlamp dashboard.
 
 ## Examples
 
@@ -103,5 +116,5 @@ The [`examples/`](examples/) directory has ready-to-use `helm-values.yaml` files
 | `cert-manager/` | ClusterIssuer for automatic Let's Encrypt SSL via cert-manager |
 | `registry/` | Private Docker registry (in-cluster) with htpasswd auth |
 | `deploy/` | Git-push deploy setup — Dokku-like `git push deploy main` experience |
-| `monitoring/` | Headlamp dashboard + Trivy vulnerability scanning |
+| `monitoring/` | Headlamp dashboard (Trivy Operator is installed from upstream by `setup.sh`) |
 | `examples/` | Example `helm-values.yaml` files for common app types |

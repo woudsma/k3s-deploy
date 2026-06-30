@@ -174,8 +174,16 @@ kubectl apply -f "${SCRIPT_DIR}/monitoring/headlamp.yaml"
 HEADLAMP_TOKEN=$(kubectl create token headlamp -n headlamp --duration=8760h 2>/dev/null || echo "(token generation failed — create manually after setup)")
 
 echo ""
-echo "▶ Setting up image vulnerability scanning..."
-kubectl apply -f "${SCRIPT_DIR}/monitoring/trivy-scan.yaml"
+echo "▶ Setting up image vulnerability scanning (Trivy Operator)..."
+# Continuous, language-agnostic scanning. The operator watches workloads and emits
+# VulnerabilityReport CRDs (kubectl get vulnerabilityreports -n default). It reuses
+# each workload's imagePullSecrets, so it scans private-registry images too.
+kubectl apply -f "https://raw.githubusercontent.com/aquasecurity/trivy-operator/v0.31.2/deploy/static/trivy-operator.yaml"
+# Scope to the default namespace, report only HIGH/CRITICAL, hide CVEs with no fix
+# available, and pin the scanner to the latest Trivy.
+kubectl -n trivy-system patch configmap trivy-operator-trivy-config --type merge \
+  -p '{"data":{"trivy.severity":"HIGH,CRITICAL","trivy.ignoreUnfixed":"true","trivy.tag":"0.71.2"}}'
+kubectl -n trivy-system set env deployment/trivy-operator OPERATOR_TARGET_NAMESPACES=default
 
 # ── zsh + oh-my-zsh (optional) ─────────────────────────────────
 
