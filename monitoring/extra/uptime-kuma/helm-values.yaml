@@ -10,7 +10,12 @@ name: uptime-kuma
 image:
   registry: docker.io
   repository: louislam/uptime-kuma
-  tag: "1"          # pinned to the v1 stable line
+  # 2.4.0-slim: least-vulnerable maintained tag (scanned 6C/59H vs 7C/131H on "1"
+  # and 71C/755H on the full "2.4.0", which bundles a Chromium for browser checks).
+  # Remaining CVEs are in upstream's bundled deps — not fixable from our side.
+  # "slim" drops browser-engine monitor types; HTTP/TCP/ping/keyword checks work.
+  # NOTE: first boot on v2 auto-migrates the v1 SQLite DB in the PVC.
+  tag: "2.4.0-slim"
   pullSecrets: false # public image, skip the private-registry creds
 
 port: 3001          # Uptime Kuma listens on 3001
