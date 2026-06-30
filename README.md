@@ -118,3 +118,4 @@ The [`examples/`](examples/) directory has ready-to-use `helm-values.yaml` files
 | `deploy/` | Git-push deploy setup — Dokku-like `git push deploy main` experience |
 | `monitoring/` | Headlamp dashboard (Trivy Operator is installed from upstream by `setup.sh`) |
 | `examples/` | Example `helm-values.yaml` files for common app types |
+| `test/` | End-to-end harness: runs `setup.sh` + a real git-push deploy in a throwaway container and asserts the cluster came up |
