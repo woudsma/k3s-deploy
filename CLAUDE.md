@@ -86,6 +86,7 @@ Self-hosted Kubernetes cluster on a Hetzner VPS using K3s. The cluster runs pers
 k3s-deploy/
 ├── cert-manager/
 │   └── cluster-issuer.yaml # Let's Encrypt ClusterIssuer (letsencrypt-prod)
+├── install.sh              # One-line bootstrap: installs git/curl, clones repo, runs setup.sh
 ├── charts/
 │   └── app/                # Generic Helm chart for all app types
 │       ├── Chart.yaml
@@ -118,11 +119,19 @@ k3s-deploy/
 │   └── registry.yaml       # Private registry: Deployment, PVC, Service, Ingress
 ├── test/
 │   ├── Dockerfile          # Systemd Ubuntu image mimicking a fresh Hetzner VPS
-│   ├── run.sh              # Runs setup.sh + a sample deploy in a container + asserts
-│   └── hello-world/        # Sample static app pushed by the deploy test
-│       ├── Dockerfile
-│       ├── index.html
-│       └── helm-values.yaml
+│   ├── run.sh              # Runs setup.sh + sample deploys in a container + asserts
+│   ├── hello-world/        # Sample static app pushed by the deploy test
+│   │   ├── Dockerfile
+│   │   ├── index.html
+│   │   └── helm-values.yaml
+│   └── monorepo-app/       # Dotted app name + .deploy conf pushed by the deploy test
+│       ├── apps/
+│       │   └── api/
+│       │       └── Dockerfile
+│       └── .deploy/
+│           ├── api.test.local.conf
+│           └── helm/
+│               └── api.yaml
 ```
 
 ---
@@ -135,7 +144,12 @@ Ubuntu container that stands in for a fresh Hetzner VPS, asserts the cluster cam
 sudoers, domain replacement), then does a **real `git push` deploy** of the
 `test/hello-world/` static app — exercising the full pipeline (Kaniko build → push to
 the private registry → Helm deploy → reachable through Traefik) with the build logs
-streaming back. 16 checks total. Requires Docker running.
+streaming back. It then runs a second **monorepo-style** git-push deploy of
+`test/monorepo-app/` under a dotted app name (`api.test.local`) driven by a
+`.deploy/<app-name>.conf` — covering a subdirectory `BUILD_CONTEXT`, a custom
+`HELM_VALUES` path, a `BUILD_ARGS` value baked into the image, the `ALLOWED_REF` guard
+(a wrong-ref push is rejected), and dash-sanitised release names for dotted apps.
+23 checks total. Requires Docker running.
 
 ```bash
 test/run.sh          # build base image (once), run setup.sh + sample deploy, assert
@@ -163,6 +177,14 @@ Test-environment accommodations (production code is unchanged):
 ---
 
 ## Cluster Setup Commands
+
+The fastest path is the one-liner, which installs git/curl, clones this repo to `/opt/k3s-deploy`, and runs `setup.sh` (which performs every step below):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/woudsma/k3s-deploy/main/install.sh | sh
+```
+
+The steps below are the manual equivalent, for reference.
 
 ### 1. Install K3s
 
@@ -305,6 +327,20 @@ See `examples/` for values files covering websites, APIs, databases, and more.
 ### First deploy — just git push
 
 The pre-receive hook runs `helm upgrade --install` with the project's `helm-values.yaml`, so the first push creates all resources and deploys.
+
+### Monorepos / multiple deploy targets
+
+A repo pushed to multiple app names (staging/prod, web/api, …) may carry a `.deploy/<app-name>.conf` per target. The hook parses it with a whitelist (never sources it) and honors:
+
+| Key | Default | Purpose |
+|---|---|---|
+| `BUILD_CONTEXT` | `.` | Docker build context, relative to repo root |
+| `DOCKERFILE` | `Dockerfile` | Dockerfile path, relative to `BUILD_CONTEXT` |
+| `HELM_VALUES` | `helm-values.yaml` | Helm values file, relative to repo root |
+| `BUILD_ARGS` | — | Space-separated `KEY=VALUE` pairs → Kaniko `--build-arg` |
+| `ALLOWED_REF` | — | Only accept this ref (e.g. `refs/heads/master` for prod) |
+
+No conf → identical to the classic single-app behavior. See `examples/monorepo/`.
 
 ### Three ways to deploy updates
 

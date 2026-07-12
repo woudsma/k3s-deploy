@@ -1,7 +1,10 @@
 #!/bin/bash
 # setup.sh — Interactive server setup for the K8s cluster.
 #
-# Run this on a fresh Ubuntu VPS after rsync'ing this repo:
+# Easiest path is the one-liner, which fetches the repo and runs this script:
+#   curl -fsSL https://raw.githubusercontent.com/woudsma/k3s-deploy/main/install.sh | sh
+#
+# Or run this directly on a fresh Ubuntu VPS after rsync'ing this repo:
 #   rsync -a --exclude='.git' . root@<server-ip>:/tmp/k3s-deploy
 #   ssh root@<server-ip>
 #   bash /tmp/k3s-deploy/setup.sh

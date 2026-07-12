@@ -18,7 +18,16 @@ After creating a fresh Hetzner VPS with Ubuntu, the guided `setup.sh` script bri
 
 **First, point your domain at the server.** Add a wildcard DNS A record for `*.<domain>` pointing to the server's IP, so any subdomain you deploy resolves without adding a new record each time. cert-manager then issues (and auto-renews) an individual TLS certificate per subdomain via the HTTP-01 challenge, so this must resolve before setup runs.
 
-Clone this repo to your local machine, then `rsync` it to the server and run `setup.sh`: 
+Then SSH into the fresh server (as `root`) and run the one-liner:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/woudsma/k3s-deploy/main/install.sh | sh
+```
+
+This installs git/curl, clones the repo to `/opt/k3s-deploy`, and launches `setup.sh`.
+
+<details>
+<summary>Prefer to clone it yourself?</summary>
 
 ```bash
 cd k3s-deploy
@@ -26,7 +35,9 @@ rsync -a --exclude='.git' . root@<server-ip>:/tmp/k3s-deploy
 ssh root@<server-ip>
 bash /tmp/k3s-deploy/setup.sh
 ```
-This prompts for your domain and registry credentials, replaces the `mysite.com` placeholder repo-wide, and installs everything: K3s, security hardening, cert-manager + Let's Encrypt, the private registry and its pull/push secrets, the git-push deploy system, and the monitoring stack.
+</details>
+
+`setup.sh` prompts for your domain and registry credentials, replaces the `mysite.com` placeholder repo-wide, and installs everything: K3s, security hardening, cert-manager + Let's Encrypt, the private registry and its pull/push secrets, the git-push deploy system, and the monitoring stack.
 
 When it finishes, the script prints the remaining manual steps — including copying the kubeconfig from `/etc/rancher/k3s/k3s.yaml` to your local `~/.kube/config` (replace `127.0.0.1` with the server IP) for remote `kubectl` access.
 
@@ -54,6 +65,8 @@ ingress:
 ```
 
 Everything else (port 80, health probe, TLS, resource limits) comes from chart defaults. See `charts/app/values.yaml` for all available options.
+
+Monorepos and multi-environment repos can push to several app names from one repository — an optional `.deploy/<app-name>.conf` per target selects the build context, Helm values file, build args and allowed ref. See [`examples/monorepo/`](examples/monorepo/).
 
 ### Deploying
 

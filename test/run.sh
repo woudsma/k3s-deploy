@@ -209,12 +209,45 @@ check "hello-world pod is Running"     "kubectl get pods -l app=hello-world --no
 check "image pulled from registry"     "kubectl get pod -l app=hello-world -o jsonpath='{.items[0].spec.containers[0].image}' | grep -q '^registry.${TEST_DOMAIN}/hello-world:'"
 check "page served through Traefik"    "curl -sk --resolve hello-world.${TEST_DOMAIN}:443:127.0.0.1 https://hello-world.${TEST_DOMAIN}/ | grep -q HELLO-FROM-K3S-DEPLOY-TEST"
 
+# ── 7. Monorepo deploy test: a dotted app name driven by .deploy conf ──
+# A second git-push that exercises the pre-receive hook's monorepo support in one
+# shot: a per-app .deploy/<app-name>.conf selecting a subdirectory BUILD_CONTEXT,
+# a non-default HELM_VALUES path, a BUILD_ARGS value baked into the image, and an
+# ALLOWED_REF guard — all under a dotted app name (api.test.local) whose release
+# name is dash-sanitised (api-test-local) while the image keeps the dots.
+blu "Deploying a monorepo-style app (dotted name + .deploy conf) via git push…"
+
+docker exec "$CONTAINER" rm -rf /root/monorepo-app
+docker cp "${REPO_ROOT}/test/monorepo-app" "$CONTAINER:/root/monorepo-app"
+docker exec "$CONTAINER" chown -R root:root /root/monorepo-app
+docker exec "$CONTAINER" bash -c \
+  'cd /root/monorepo-app && git init -q && git add -A && git -c user.email=t@t.local -c user.name=tester commit -qm "monorepo app"'
+
+# Negative: ALLOWED_REF="refs/heads/main" must reject a push to another ref.
+if docker exec "$CONTAINER" bash -c \
+  'cd /root/monorepo-app && GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git push deploy@localhost:api.test.local HEAD:refs/heads/dev' >/dev/null 2>&1; then
+  red "  ✗ ALLOWED_REF guard rejects the wrong ref"; FAIL=$((FAIL + 1))
+else
+  grn "  ✓ ALLOWED_REF guard rejects the wrong ref"; PASS=$((PASS + 1))
+fi
+
+# Positive: pushing the allowed ref builds and deploys the dotted app.
+docker exec "$CONTAINER" bash -c \
+  'cd /root/monorepo-app && GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git push deploy@localhost:api.test.local HEAD:main'
+DEPLOY2_RC=$?
+if [ "$DEPLOY2_RC" -eq 0 ]; then grn "git push deploy (monorepo) exited 0"; else red "git push deploy (monorepo) exited ${DEPLOY2_RC}"; fi
+
+blu "Verifying the monorepo-deployed app…"
+check "api.test.local pod is Running"    "kubectl get pods -l app=api-test-local --no-headers | grep -q ' Running'"
+check "dotted image pulled from registry" "kubectl get pod -l app=api-test-local -o jsonpath='{.items[0].spec.containers[0].image}' | grep -q '^registry.${TEST_DOMAIN}/api.${TEST_DOMAIN}:'"
+check "build arg baked into served page"  "curl -sk --resolve api.${TEST_DOMAIN}:443:127.0.0.1 https://api.${TEST_DOMAIN}/ | grep -q 'MONOREPO-API MONOREPO-BUILD-ARG-OK'"
+
 # ── Summary ───────────────────────────────────────────────────
 echo
-if [ "$FAIL" -eq 0 ] && [ "$SETUP_RC" -eq 0 ] && [ "${DEPLOY_RC:-1}" -eq 0 ]; then
+if [ "$FAIL" -eq 0 ] && [ "$SETUP_RC" -eq 0 ] && [ "${DEPLOY_RC:-1}" -eq 0 ] && [ "${DEPLOY2_RC:-1}" -eq 0 ]; then
   grn "PASS — ${PASS}/$((PASS + FAIL)) checks (container left running; 'test/run.sh shell' to inspect)"
   exit 0
 else
-  red "FAIL — ${FAIL} check(s) failed, setup rc=${SETUP_RC}, deploy rc=${DEPLOY_RC:-?} (container left running; 'test/run.sh shell' to inspect)"
+  red "FAIL — ${FAIL} check(s) failed, setup rc=${SETUP_RC}, deploy rc=${DEPLOY_RC:-?}, monorepo rc=${DEPLOY2_RC:-?} (container left running; 'test/run.sh shell' to inspect)"
   exit 1
 fi

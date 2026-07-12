@@ -1,0 +1,14 @@
+# Helm values for the dotted app name `api.test.local`.
+#
+# The release/deployment name must be DNS-safe (dashes), while image.repository
+# must keep the dots to match the pushed repo name — the hook tags images after
+# it (registry.test.local/api.test.local:<sha>).
+name: api-test-local
+
+image:
+  registry: registry.test.local
+  repository: api.test.local
+
+ingress:
+  hosts:
+    - api.test.local

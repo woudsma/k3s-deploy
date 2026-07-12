@@ -42,6 +42,10 @@ See `charts/app/values.yaml` for all available options and their defaults. A web
 
 See `environments/` for per-environment Helm values files (dev, test, prod). Each environment gets its own namespace, hostname, resource limits, and replicas. The `github-actions/deploy-environments.yaml` workflow shows how to wire this into CI/CD with staged deployments.
 
+## Monorepos & multiple deploy targets
+
+See `monorepo/` for deploying several apps and/or environments from a single repository via git push — one `.deploy/<app-name>.conf` per deploy target selects the build context, Dockerfile, Helm values file, build args and allowed ref.
+
 ## GitHub Actions
 
 See `github-actions/` for CI workflow examples that use `helm upgrade --install` instead of `kubectl apply`.

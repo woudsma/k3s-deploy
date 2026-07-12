@@ -39,6 +39,10 @@ helm upgrade --install my-app /opt/helm-charts/app -f helm-values.prod.yaml -n p
 
 See `../github-actions/deploy-environments.yaml` for a GitHub Actions workflow that deploys to dev on every push, to test on tags, and to prod with manual approval.
 
+## Git-push deploys per environment
+
+Instead of deploying from CI, each environment can be its own git-push target: push the same repo to `deploy@server:staging.mysite.com` and `deploy@server:mysite.com`, and let a `.deploy/<app-name>.conf` per target pick the right values file (and optionally restrict which ref may be pushed). See `../monorepo/` for the conf format — it works for single-app repos with multiple environments too.
+
 ## Namespace setup
 
 Create the namespaces and copy the registry pull secret to each:

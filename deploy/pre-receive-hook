@@ -33,8 +33,9 @@ fi
 CONTEXT_DIR="/opt/build-contexts/${APP_NAME}"
 
 # ── Read the push ──────────────────────────────────────────────
-while read -r _oldrev newrev _refname; do
+while read -r _oldrev newrev refname; do
   SHA="$newrev"
+  REFNAME="$refname"
 done
 
 TAG="${SHA:0:7}"
@@ -63,6 +64,59 @@ rm -rf "$CONTEXT_DIR"
 mkdir -p "$CONTEXT_DIR"
 git archive "$SHA" | tar -x -C "$CONTEXT_DIR"
 
+# ── Optional per-app deploy config (monorepo support) ─────────
+# A repo pushed to multiple app names (staging/prod, web/api, …) may carry a
+# .deploy/<app-name>.conf per target that selects the build context, Dockerfile,
+# Helm values file, build args and an allowed ref. Keys are parsed with a
+# whitelist (never sourced), so pushed code cannot override hook config.
+# Without a conf the hook behaves exactly as before.
+BUILD_CONTEXT="."
+DOCKERFILE="Dockerfile"
+HELM_VALUES="helm-values.yaml"
+BUILD_ARGS=""
+ALLOWED_REF=""
+APP_CONF="${CONTEXT_DIR}/.deploy/${APP_NAME}.conf"
+if [ -f "$APP_CONF" ]; then
+  echo "▶ Using deploy config: .deploy/${APP_NAME}.conf"
+  conf() { sed -n "s/^$1=//p" "$APP_CONF" | tail -1 | sed -e "s/^[\"']//" -e "s/[\"']$//"; }
+  BUILD_CONTEXT="$(conf BUILD_CONTEXT)";  BUILD_CONTEXT="${BUILD_CONTEXT:-.}"
+  DOCKERFILE="$(conf DOCKERFILE)";        DOCKERFILE="${DOCKERFILE:-Dockerfile}"
+  HELM_VALUES="$(conf HELM_VALUES)";      HELM_VALUES="${HELM_VALUES:-helm-values.yaml}"
+  BUILD_ARGS="$(conf BUILD_ARGS)"
+  ALLOWED_REF="$(conf ALLOWED_REF)"
+
+  # Reject absolute paths and traversal in user-supplied paths
+  for _p in "$BUILD_CONTEXT" "$DOCKERFILE" "$HELM_VALUES"; do
+    case "$_p" in
+      /*|*..*)
+        echo "✗ Invalid path in .deploy/${APP_NAME}.conf: ${_p}" >&2
+        rm -rf "$CONTEXT_DIR"
+        exit 1
+        ;;
+    esac
+  done
+
+  # Guard: e.g. a prod app only accepts refs/heads/master
+  if [ -n "$ALLOWED_REF" ] && [ "$REFNAME" != "$ALLOWED_REF" ]; then
+    echo "✗ ${APP_NAME} only accepts pushes to ${ALLOWED_REF} (got ${REFNAME})." >&2
+    rm -rf "$CONTEXT_DIR"
+    exit 1
+  fi
+
+  if [ ! -d "${CONTEXT_DIR}/${BUILD_CONTEXT}" ]; then
+    echo "✗ BUILD_CONTEXT '${BUILD_CONTEXT}' not found in pushed tree." >&2
+    rm -rf "$CONTEXT_DIR"
+    exit 1
+  fi
+
+  # Each KEY=VALUE becomes a Kaniko --build-arg (values must not contain
+  # spaces). Word-splitting is intentional — one build arg per item.
+  # shellcheck disable=SC2086
+  for _ba in $BUILD_ARGS; do
+    EXTRA_ARGS_YAML+="            - \"--build-arg=${_ba}\""$'\n'
+  done
+fi
+
 # ── Clean up previous build job ────────────────────────────────
 kubectl delete job "$JOB_NAME" --ignore-not-found -n "$NAMESPACE" 2>&1 || true
 
@@ -86,8 +140,8 @@ spec:
         - name: kaniko
           image: gcr.io/kaniko-project/executor:latest
           args:
-            - "--dockerfile=Dockerfile"
-            - "--context=dir:///workspace"
+            - "--dockerfile=${DOCKERFILE}"
+            - "--context=dir:///workspace/${BUILD_CONTEXT}"
             - "--destination=${IMAGE}"
             - "--destination=${REGISTRY}/${APP_NAME}:latest"
             - "--cache=true"
@@ -162,15 +216,15 @@ if [ "$STATUS" != "1" ]; then
 fi
 
 # ── Deploy ──────────────────────────────────────────────────────
-if [ -f "${CONTEXT_DIR}/helm-values.yaml" ]; then
+if [ -f "${CONTEXT_DIR}/${HELM_VALUES}" ]; then
   # ── Helm deploy ──────────────────────────────────────────────
   echo "▶ Deploying with Helm..."
   helm upgrade --install "$SAFE_NAME" "$CHART_PATH" \
-    -f "${CONTEXT_DIR}/helm-values.yaml" \
+    -f "${CONTEXT_DIR}/${HELM_VALUES}" \
     --set image.tag="$TAG" \
     -n "$NAMESPACE" 2>&1
 
-  DEPLOY_NAME=$(grep '^name:' "${CONTEXT_DIR}/helm-values.yaml" | awk '{print $2}' | tr -d "\"'")
+  DEPLOY_NAME=$(grep '^name:' "${CONTEXT_DIR}/${HELM_VALUES}" | awk '{print $2}' | tr -d "\"'")
   DEPLOY_NAME="${DEPLOY_NAME:-$SAFE_NAME}"
   echo "▶ Waiting for rollout..."
   for _ in $(seq 1 15); do
@@ -221,7 +275,7 @@ elif [ -d "${CONTEXT_DIR}/k8s" ]; then
   prune_old_images
 
 else
-  echo "⚠ No helm-values.yaml or k8s/ directory found — image built and pushed, but no deploy performed."
+  echo "⚠ No ${HELM_VALUES} or k8s/ directory found — image built and pushed, but no deploy performed."
   rm -rf "$CONTEXT_DIR"
   exit 0
 fi
