@@ -211,9 +211,26 @@ if [[ "${DO_ZSH,,}" == "y" ]]; then
   echo ""
   echo "▶ Installing zsh + oh-my-zsh..."
   apt install zsh -y
-  sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
-  git clone https://github.com/zsh-users/zsh-autosuggestions "${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions"
-  echo "zstyle ':omz:update' mode disabled" >> ~/.zshrc
+  # oh-my-zsh's installer exits non-zero if ~/.oh-my-zsh already exists, which
+  # would abort this script on a re-run — only install it the first time.
+  if [ ! -d "${HOME}/.oh-my-zsh" ]; then
+    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+  fi
+
+  # zsh-autosuggestions: clone into oh-my-zsh's custom plugins and enable it so
+  # it's active on every login (oh-my-zsh only downloads plugins you list).
+  ZSH_CUSTOM_DIR="${ZSH_CUSTOM:-${HOME}/.oh-my-zsh/custom}"
+  if [ ! -d "${ZSH_CUSTOM_DIR}/plugins/zsh-autosuggestions" ]; then
+    git clone --depth 1 https://github.com/zsh-users/zsh-autosuggestions \
+      "${ZSH_CUSTOM_DIR}/plugins/zsh-autosuggestions"
+  fi
+  # append it to the plugins=(...) array (the default .zshrc ships with `plugins=(git)`)
+  if ! grep -q 'zsh-autosuggestions' ~/.zshrc; then
+    sed -i 's/^plugins=(\(.*\))/plugins=(\1 zsh-autosuggestions)/' ~/.zshrc
+  fi
+  if ! grep -q "':omz:update' mode disabled" ~/.zshrc 2>/dev/null; then
+    echo "zstyle ':omz:update' mode disabled" >> ~/.zshrc
+  fi
 
   # zsh doesn't source /etc/profile.d/ — add the kubectl alias to .zshrc
   if ! grep -q "alias k='kubectl'" ~/.zshrc; then
@@ -231,9 +248,33 @@ if [[ "${DO_MOTD,,}" == "y" ]]; then
   cp "${SCRIPT_DIR}/deploy/motd.sh" /etc/profile.d/k8s-motd.sh
   chmod 644 /etc/profile.d/k8s-motd.sh
 
-  # zsh doesn't source /etc/profile.d/ — add it to .zshrc if zsh is in use
+  # zsh doesn't source /etc/profile.d/ — add an async loader to .zshrc so the
+  # prompt is usable immediately while the (slow) cluster status renders above it.
   if [ -f ~/.zshrc ] && ! grep -q 'k8s-motd.sh' ~/.zshrc; then
-    echo -e '\n# K8s cluster status on login\nsource /etc/profile.d/k8s-motd.sh' >> ~/.zshrc
+    cat >> ~/.zshrc <<'ZSHRC'
+
+# K8s cluster status — rendered asynchronously so the shell is usable immediately.
+# Helpers (help, motd) load synchronously; the live status streams in above the
+# prompt as it becomes ready, so you can start typing right away.
+K8S_MOTD_NO_STATUS=1 source /etc/profile.d/k8s-motd.sh
+if [[ -o interactive ]] && [[ -z ${_K8S_MOTD_SHOWN:-} ]]; then
+  _K8S_MOTD_SHOWN=1
+  zmodload zsh/system 2>/dev/null
+  _k8s_motd_render() {
+    local chunk
+    if sysread -i $1 chunk 2>/dev/null; then
+      print -rn -- "$chunk"
+      zle -I
+    else
+      zle -F $1
+      exec {_k8s_motd_fd}<&-
+      zle -I
+    fi
+  }
+  exec {_k8s_motd_fd}< <(K8S_MOTD_STATUS_ONLY=1 /etc/profile.d/k8s-motd.sh 2>/dev/null)
+  zle -F $_k8s_motd_fd _k8s_motd_render
+fi
+ZSHRC
   fi
 fi
 

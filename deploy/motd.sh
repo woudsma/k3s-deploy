@@ -7,8 +7,9 @@
 #
 # Requires: kubectl accessible on the PATH.
 
-# Skip for non-interactive shells (scp, git push, etc.)
-[[ $- != *i* ]] && return
+# Skip for non-interactive shells (scp, git push, etc.) — unless we were invoked
+# purely to render the status (the async loader in ~/.zshrc does this in a subshell).
+[[ $- != *i* && -z "${K8S_MOTD_STATUS_ONLY:-}" ]] && return 2>/dev/null
 
 export KUBECONFIG="${KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}"
 
@@ -35,6 +36,7 @@ bar() {
 
 # ── help: a quick-start guide for this VPS (overrides the bash builtin) ─────────
 # Defined for interactive shells so `help` shows how to deploy, reach Headlamp, etc.
+if [[ -z "${K8S_MOTD_STATUS_ONLY:-}" ]]; then
 help() {
   local ip domain
   ip=$(hostname -I 2>/dev/null | awk '{print $1}')
@@ -65,6 +67,12 @@ EOF
 }
 # Re-run the status banner on demand.
 alias motd='source /etc/profile.d/k8s-motd.sh'
+fi
+
+# ── k8s_status: render the live cluster banner ─────────────────
+# Wrapped in a function so the async loader can run just this (slow) part in a
+# background subshell (see the zsh snippet setup.sh writes to ~/.zshrc).
+k8s_status() {
 
 echo ""
 echo -e "${BOLD}${CYAN}── K3s Cluster Status ──────────────────────────────${RESET}"
@@ -236,3 +244,15 @@ fi
 
 echo -e "${DIM}── $(date '+%Y-%m-%d %H:%M:%S') ──${RESET}"
 echo ""
+}
+
+# ── Dispatch ───────────────────────────────────────────────────
+# STATUS_ONLY : only render the banner (used by the async subshell in ~/.zshrc).
+# NO_STATUS   : only define helpers/functions, don't print (the async loader
+#               sources with this set, then renders k8s_status in the background).
+# neither     : define helpers + print synchronously (bash /etc/profile.d, `motd`).
+if [[ -n "${K8S_MOTD_STATUS_ONLY:-}" ]]; then
+  k8s_status
+elif [[ -z "${K8S_MOTD_NO_STATUS:-}" ]]; then
+  k8s_status
+fi
