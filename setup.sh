@@ -54,6 +54,25 @@ echo ""
 echo "▶ Updating packages..."
 apt update -y
 
+# ── Prefer IPv4 if IPv6 is broken ──────────────────────────────
+
+# Some fresh VPSes (seen on Hetzner) advertise IPv6 that isn't actually routed:
+# external HTTPS then hairpins back to this node's own Traefik ("subjectAltName
+# does not match" / "TRAEFIK DEFAULT CERT"), breaking the K3s installer, image
+# pulls and cert-manager's ACME calls cluster-wide. Testing plain curl isn't
+# enough — Happy Eyeballs hides the problem until Traefik is up. Probe IPv6
+# directly: if IPv4 reaches the internet but IPv6 doesn't, disable IPv6.
+if curl -4 -fsS --max-time 10 https://get.k3s.io -o /dev/null 2>/dev/null \
+   && ! curl -6 -fsS --max-time 10 https://get.k3s.io -o /dev/null 2>/dev/null; then
+  echo ""
+  echo "▶ IPv6 connectivity is broken — disabling IPv6 for this host..."
+  cat > /etc/sysctl.d/99-disable-ipv6.conf <<'EOF'
+net.ipv6.conf.all.disable_ipv6 = 1
+net.ipv6.conf.default.disable_ipv6 = 1
+EOF
+  sysctl --system >/dev/null
+fi
+
 # ── Install K3s ────────────────────────────────────────────────
 
 echo ""
