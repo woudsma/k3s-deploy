@@ -130,33 +130,50 @@ if ! command -v kubectl &>/dev/null; then
   return 2>/dev/null || exit 0
 fi
 
-if ! kubectl cluster-info &>/dev/null 2>&1; then
+# ── Fetch everything in parallel ───────────────────────────────
+# One round-trip's worth of latency instead of ~9 sequential calls. Results land
+# in temp files; the subshell keeps job-control chatter out of the interactive
+# `motd` command, and --request-timeout stops a wedged API from stalling login.
+_motd_tmp=$(mktemp -d 2>/dev/null) || { _motd_tmp="/tmp/k8s-motd.$$"; mkdir -p "$_motd_tmp"; }
+(
+  kubectl get nodes --no-headers --request-timeout=5s           >"$_motd_tmp/nodes" 2>/dev/null &
+  kubectl get pods -A --no-headers --request-timeout=5s         >"$_motd_tmp/pods"  2>/dev/null &
+  kubectl get pvc -A --no-headers --request-timeout=5s          >"$_motd_tmp/pvc"   2>/dev/null &
+  kubectl get jobs -A --no-headers --request-timeout=5s         >"$_motd_tmp/jobs"  2>/dev/null &
+  kubectl get certificates -A --no-headers --request-timeout=5s >"$_motd_tmp/certs" 2>/dev/null &
+  command -v helm &>/dev/null && helm list -A --no-headers       >"$_motd_tmp/helm"  2>/dev/null &
+  wait
+)
+
+# A healthy cluster always has at least one node; an empty file means unreachable.
+if [ ! -s "$_motd_tmp/nodes" ]; then
   echo -e "  ${RED}Cluster unreachable${RESET}"
   echo ""
+  rm -rf "$_motd_tmp"
   # shellcheck disable=SC2317  # `exit 0` is reached only if run directly, not sourced
   return 2>/dev/null || exit 0
 fi
 
 # Node status
 echo -e "${BOLD}Nodes${RESET}"
-kubectl get nodes --no-headers 2>/dev/null | while read -r name state _ age version; do
+while read -r name state _ age version; do
   if [[ "$state" == "Ready" ]]; then
     echo -e "  ${GREEN}●${RESET} ${name}  ${state}  ${DIM}${age}  ${version}${RESET}"
   else
     echo -e "  ${RED}●${RESET} ${name}  ${state}  ${DIM}${age}  ${version}${RESET}"
   fi
-done
+done < "$_motd_tmp/nodes"
 echo ""
 
 # Pods needing attention (not Running/Completed/Succeeded)
 echo -e "${BOLD}Pods requiring attention${RESET}"
-problem_pods=$(kubectl get pods --all-namespaces --no-headers 2>/dev/null | awk '
+problem_pods=$(awk '
   $4 !~ /^(Running|Completed|Succeeded)$/ { print }
   $4 == "Running" && $2 ~ /[0-9]+\/[0-9]+/ {
     split($2, a, "/");
     if (a[1] != a[2]) print
   }
-')
+' "$_motd_tmp/pods")
 
 if [ -z "$problem_pods" ]; then
   echo -e "  ${GREEN}All pods healthy${RESET}"
@@ -173,10 +190,10 @@ fi
 echo ""
 
 # Recent restarts (pods with high restart counts)
-high_restart_pods=$(kubectl get pods --all-namespaces --no-headers 2>/dev/null | awk '{
+high_restart_pods=$(awk '{
   restarts = $5 + 0;
   if (restarts >= 5) print $1, $2, $5
-}')
+}' "$_motd_tmp/pods")
 
 if [ -n "$high_restart_pods" ]; then
   echo -e "${BOLD}${YELLOW}High restart counts${RESET}"
@@ -186,21 +203,19 @@ if [ -n "$high_restart_pods" ]; then
   echo ""
 fi
 
-# Certificates not ready
-if kubectl api-resources --api-group=cert-manager.io &>/dev/null 2>&1; then
-  expiring_certs=$(kubectl get certificates --all-namespaces --no-headers 2>/dev/null | awk '$3 != "True" {print $1, $2, $3}')
-  if [ -n "$expiring_certs" ]; then
-    echo -e "${BOLD}${YELLOW}Certificate issues${RESET}"
-    echo "$expiring_certs" | while read -r ns name ready; do
-      echo -e "  ${YELLOW}⚠${RESET} ${ns}/${name}  Ready=${ready}"
-    done
-    echo ""
-  fi
+# Certificates not ready (the file is empty if cert-manager CRDs aren't installed)
+expiring_certs=$(awk '$3 != "True" {print $1, $2, $3}' "$_motd_tmp/certs")
+if [ -n "$expiring_certs" ]; then
+  echo -e "${BOLD}${YELLOW}Certificate issues${RESET}"
+  echo "$expiring_certs" | while read -r ns name ready; do
+    echo -e "  ${YELLOW}⚠${RESET} ${ns}/${name}  Ready=${ready}"
+  done
+  echo ""
 fi
 
 # PVC usage summary
 echo -e "${BOLD}Storage (PVCs)${RESET}"
-pvcs=$(kubectl get pvc --all-namespaces --no-headers 2>/dev/null)
+pvcs=$(<"$_motd_tmp/pvc")
 if [ -z "$pvcs" ]; then
   echo -e "  ${DIM}No PVCs found${RESET}"
 else
@@ -217,7 +232,7 @@ echo ""
 # Helm releases
 if command -v helm &>/dev/null; then
   echo -e "${BOLD}Helm releases${RESET}"
-  releases=$(helm list --all-namespaces --no-headers 2>/dev/null)
+  releases=$(<"$_motd_tmp/helm")
   if [ -z "$releases" ]; then
     echo -e "  ${DIM}No releases${RESET}"
   else
@@ -233,7 +248,7 @@ if command -v helm &>/dev/null; then
 fi
 
 # Failed jobs (last 10)
-failed_jobs=$(kubectl get jobs --all-namespaces --no-headers 2>/dev/null | awk '$3 == "0/1" || $4 ~ /BackoffLimitExceeded/ {print $1, $2, $5}' | tail -5)
+failed_jobs=$(awk '$3 == "0/1" || $4 ~ /BackoffLimitExceeded/ {print $1, $2, $5}' "$_motd_tmp/jobs" | tail -5)
 if [ -n "$failed_jobs" ]; then
   echo -e "${BOLD}${RED}Failed jobs${RESET}"
   echo "$failed_jobs" | while read -r ns name age; do
@@ -241,6 +256,8 @@ if [ -n "$failed_jobs" ]; then
   done
   echo ""
 fi
+
+rm -rf "$_motd_tmp"
 
 echo -e "${DIM}── $(date '+%Y-%m-%d %H:%M:%S') ──${RESET}"
 echo ""

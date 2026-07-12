@@ -260,18 +260,20 @@ K8S_MOTD_NO_STATUS=1 source /etc/profile.d/k8s-motd.sh
 if [[ -o interactive ]] && [[ -z ${_K8S_MOTD_SHOWN:-} ]]; then
   _K8S_MOTD_SHOWN=1
   zmodload zsh/system 2>/dev/null
+  _k8s_motd_buf=""
   _k8s_motd_render() {
     local chunk
     if sysread -i $1 chunk 2>/dev/null; then
-      print -rn -- "$chunk"
-      zle -I
-    else
+      _k8s_motd_buf+="$chunk"          # accumulate; print once at EOF so the
+    else                               # prompt isn't redrawn between chunks
       zle -F $1
       exec {_k8s_motd_fd}<&-
-      zle -I
+      print -rn -- $'\r\e[J'"$_k8s_motd_buf"   # clear prompt line, print banner
+      unset _k8s_motd_buf
+      zle -I                           # redraw the prompt once, below the banner
     fi
   }
-  exec {_k8s_motd_fd}< <(K8S_MOTD_STATUS_ONLY=1 /etc/profile.d/k8s-motd.sh 2>/dev/null)
+  exec {_k8s_motd_fd}< <(K8S_MOTD_STATUS_ONLY=1 bash /etc/profile.d/k8s-motd.sh 2>/dev/null)
   zle -F $_k8s_motd_fd _k8s_motd_render
 fi
 ZSHRC
