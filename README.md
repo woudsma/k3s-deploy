@@ -37,7 +37,7 @@ bash /tmp/k3s-deploy/setup.sh
 ```
 </details>
 
-`setup.sh` prompts for your domain and registry credentials, replaces the `mysite.com` placeholder repo-wide, and installs everything: K3s, security hardening, cert-manager + Let's Encrypt, the private registry and its pull/push secrets, the git-push deploy system, and the monitoring stack.
+`setup.sh` prompts for your domain and registry credentials, replaces the `mysite.com` placeholder repo-wide, and installs everything: K3s, security hardening, cert-manager + Let's Encrypt, the private registry and its pull/push secrets, the git-push deploy system, and (optionally) the Headlamp dashboard. Optional extras — security hardening, swap, Headlamp, zsh, and the login banner — are individual yes/no prompts.
 
 When it finishes, the script prints the remaining manual steps — including copying the kubeconfig from `/etc/rancher/k3s/k3s.yaml` to your local `~/.kube/config` (replace `127.0.0.1` with the server IP) for remote `kubectl` access.
 
@@ -90,9 +90,10 @@ See [CLAUDE.md](CLAUDE.md) for full setup instructions, commands, and architectu
 
 A lightweight web dashboard at `headlamp.<domain>` for browsing pods, viewing logs, exec-ing into containers, and checking resource status.
 
-Deployed automatically by `setup.sh`. To generate a login token:
+Optional — `setup.sh` asks whether to install it. To deploy it later, or to generate a login token:
 
 ```bash
+kubectl apply -f monitoring/headlamp.yaml   # if you skipped it during setup
 kubectl create token headlamp -n headlamp --duration=8760h
 ```
 

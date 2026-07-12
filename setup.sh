@@ -33,6 +33,7 @@ REGISTRY="registry.${DOMAIN}"
 
 read -rp "Set up security hardening (firewall, fail2ban, disable password auth)? [y/N] " DO_SECURITY
 read -rp "Add 1GB swap space? [y/N] " DO_SWAP
+read -rp "Install Headlamp dashboard (web UI at headlamp.${DOMAIN})? [y/N] " DO_HEADLAMP
 read -rp "Install zsh + oh-my-zsh? [y/N] " DO_ZSH
 read -rp "Install login banner (motd.sh — shows cluster status on SSH login)? [y/N] " DO_MOTD
 
@@ -187,11 +188,13 @@ bash "${SCRIPT_DIR}/deploy/setup-deploy.sh" "$(cat ~/.ssh/authorized_keys)"
 
 # ── Monitoring ─────────────────────────────────────────────────
 
-echo ""
-echo "▶ Deploying Headlamp dashboard..."
-kubectl apply -f "${SCRIPT_DIR}/monitoring/headlamp.yaml"
+if [[ "${DO_HEADLAMP,,}" == "y" ]]; then
+  echo ""
+  echo "▶ Deploying Headlamp dashboard..."
+  kubectl apply -f "${SCRIPT_DIR}/monitoring/headlamp.yaml"
 
-HEADLAMP_TOKEN=$(kubectl create token headlamp -n headlamp --duration=8760h 2>/dev/null || echo "(token generation failed — create manually after setup)")
+  HEADLAMP_TOKEN=$(kubectl create token headlamp -n headlamp --duration=8760h 2>/dev/null || echo "(token generation failed — create manually after setup)")
+fi
 
 echo ""
 echo "▶ Setting up image vulnerability scanning (Trivy Operator)..."
@@ -300,10 +303,12 @@ echo "3. Test a deploy:"
 echo "   git remote add deploy deploy@${SERVER_IP}:test-app"
 echo "   git push deploy main"
 echo ""
-echo "4. Log in to Headlamp dashboard:"
-echo "   https://headlamp.${DOMAIN}"
-echo "   Token: ${HEADLAMP_TOKEN}"
-echo ""
+if [[ "${DO_HEADLAMP,,}" == "y" ]]; then
+  echo "4. Log in to Headlamp dashboard:"
+  echo "   https://headlamp.${DOMAIN}"
+  echo "   Token: ${HEADLAMP_TOKEN}"
+  echo ""
+fi
 echo "5. For GitHub Actions, add these repo secrets:"
 echo "   KUBECONFIG    — contents of ~/.kube/config (with server IP)"
 echo "   REGISTRY_USER — ${REG_USER}"
