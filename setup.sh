@@ -54,30 +54,28 @@ echo ""
 echo "▶ Updating packages..."
 apt update -y
 
-# ── Prefer IPv4 if IPv6 is broken ──────────────────────────────
-
-# Some fresh VPSes (seen on Hetzner) advertise IPv6 that isn't actually routed:
-# external HTTPS then hairpins back to this node's own Traefik ("subjectAltName
-# does not match" / "TRAEFIK DEFAULT CERT"), breaking the K3s installer, image
-# pulls and cert-manager's ACME calls cluster-wide. Testing plain curl isn't
-# enough — Happy Eyeballs hides the problem until Traefik is up. Probe IPv6
-# directly: if IPv4 reaches the internet but IPv6 doesn't, disable IPv6.
-if curl -4 -fsS --max-time 10 https://get.k3s.io -o /dev/null 2>/dev/null \
-   && ! curl -6 -fsS --max-time 10 https://get.k3s.io -o /dev/null 2>/dev/null; then
-  echo ""
-  echo "▶ IPv6 connectivity is broken — disabling IPv6 for this host..."
-  cat > /etc/sysctl.d/99-disable-ipv6.conf <<'EOF'
-net.ipv6.conf.all.disable_ipv6 = 1
-net.ipv6.conf.default.disable_ipv6 = 1
-EOF
-  sysctl --system >/dev/null
-fi
-
 # ── Install K3s ────────────────────────────────────────────────
 
 echo ""
 echo "▶ Installing K3s..."
-curl -sfL https://get.k3s.io | sh -
+
+# The K3s installer normally resolves the "stable" channel via update.k3s.io, but
+# that host is load-balanced across backends and some intermittently serve a bogus
+# "TRAEFIK DEFAULT CERT" (curl: (60) subjectAltName / SSL verify errors). Pin the
+# version from GitHub instead so the installer skips the channel lookup entirely
+# and pulls the binary straight from github.com. Falls back to the channel if the
+# GitHub lookup is unavailable (e.g. API rate limit).
+K3S_RELEASE_JSON="$(curl -fsSL --max-time 20 \
+  https://api.github.com/repos/k3s-io/k3s/releases/latest 2>/dev/null || true)"
+K3S_VERSION="$(awk -F'"' '/"tag_name"/{print $4; exit}' <<<"${K3S_RELEASE_JSON}")"
+
+if [ -n "${K3S_VERSION}" ]; then
+  echo "  Installing K3s ${K3S_VERSION} (pinned from GitHub, skipping update.k3s.io)..."
+  curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="${K3S_VERSION}" sh -
+else
+  echo "  Could not resolve version from GitHub; falling back to the stable channel..."
+  curl -sfL https://get.k3s.io | sh -
+fi
 
 echo "  Waiting for node to be ready..."
 until kubectl get nodes &>/dev/null; do sleep 2; done
