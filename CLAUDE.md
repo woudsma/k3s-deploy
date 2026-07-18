@@ -84,6 +84,7 @@ Self-hosted Kubernetes cluster on a Hetzner VPS using K3s. The cluster runs pers
 
 ```
 k3s-deploy/
+├── AGENTS.md               # Self-contained deploy guide for AI agents
 ├── cert-manager/
 │   └── cluster-issuer.yaml # Let's Encrypt ClusterIssuer (letsencrypt-prod)
 ├── install.sh              # One-line bootstrap: installs git/curl, clones repo, runs setup.sh

@@ -84,6 +84,14 @@ Two ways to deploy updates:
 
 See [CLAUDE.md](CLAUDE.md) for full setup instructions, commands, and architecture decisions.
 
+### Deploying with an AI agent
+
+[AGENTS.md](AGENTS.md) is a self-contained guide covering everything above — paste its raw URL into a prompt in any project and the agent knows how to deploy that app to your cluster without reading this repo:
+
+```
+https://raw.githubusercontent.com/woudsma/k3s-deploy/main/AGENTS.md
+```
+
 ## Monitoring
 
 ### Headlamp (cluster dashboard)
